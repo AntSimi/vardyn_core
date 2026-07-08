@@ -3,6 +3,7 @@ Coordinates windowed assimilation runs and process orchestration.
 """
 
 import os
+
 # Disable HDF5 file locking BEFORE any xarray/netCDF4 import. On shared
 # filesystems (NFS/Lustre) concurrent reads from sibling subprocesses can
 # raise "NetCDF: Not a valid ID" otherwise.
@@ -34,25 +35,45 @@ from . import exp, tools as grid, state, mod, inv, diag, obs as _obs
 from .tools import gaspari_cohn
 
 
-def prepare_process(config, config_eq, State, 
-                    init_date, final_date,
-                    grid_type=None, grid_type_eq=None,
-                    nx_proc=None, ny_proc=None, dx=None, dy=None,
-                    dlon=None, dlat=None,
-                    time_window_size_proc=None, space_window_size_proc_x=None, space_window_size_proc_y=None, 
-                    space_window_size_proc_x_eq=None, space_window_size_proc_y_eq=None,
-                    nx_proc_eq=None, ny_proc_eq=None,
-                    time_overlap=5, space_overlap_x=2, space_overlap_y=2,
-                    flag_init_from_previous=True, flag_init=False, flag_background=False,
-                    flag_assim=True, flag_assim_restart=False,
-                    name_exp_init=None, name_exp_background=None,
-                    gpu_devices=['0'],
-                    obs_max_workers=None,
-                    read_obs=False,
-                    dir_save_pickle=None):
+def prepare_process(
+    config,
+    config_eq,
+    State,
+    init_date,
+    final_date,
+    grid_type=None,
+    grid_type_eq=None,
+    nx_proc=None,
+    ny_proc=None,
+    dx=None,
+    dy=None,
+    dlon=None,
+    dlat=None,
+    time_window_size_proc=None,
+    space_window_size_proc_x=None,
+    space_window_size_proc_y=None,
+    space_window_size_proc_x_eq=None,
+    space_window_size_proc_y_eq=None,
+    nx_proc_eq=None,
+    ny_proc_eq=None,
+    time_overlap=5,
+    space_overlap_x=2,
+    space_overlap_y=2,
+    flag_init_from_previous=True,
+    flag_init=False,
+    flag_background=False,
+    flag_assim=True,
+    flag_assim_restart=False,
+    name_exp_init=None,
+    name_exp_background=None,
+    gpu_devices=["0"],
+    obs_max_workers=None,
+    read_obs=False,
+    dir_save_pickle=None,
+):
     """
     Prepare subprocesses for assimilation in subwindows in time and space.
-    The subprocesses can then be run in parallel using multiprocessing. 
+    The subprocesses can then be run in parallel using multiprocessing.
     The outputs of the subprocesses can then be merged using merge_output_date().
 
     Parameters
@@ -190,7 +211,7 @@ def prepare_process(config, config_eq, State,
     n_wt = 0
 
     if dir_save_pickle is not None:
-        path_save_pickle = f'{dir_save_pickle}/{config.EXP.name_experiment}'
+        path_save_pickle = f"{dir_save_pickle}/{config.EXP.name_experiment}"
         if not os.path.exists(path_save_pickle):
             os.makedirs(path_save_pickle)
     else:
@@ -198,15 +219,15 @@ def prepare_process(config, config_eq, State,
 
     # Determine grid type
     if grid_type is None:
-        grid_type = getattr(config.GRID, 'super', 'GRID_CAR')
+        grid_type = getattr(config.GRID, "super", "GRID_CAR")
     if grid_type_eq is None:
         grid_type_eq = grid_type
-    if grid_type == 'GRID_GEO':
+    if grid_type == "GRID_GEO":
         if dlon is None:
             dlon = config.GRID.dlon
         if dlat is None:
             dlat = config.GRID.dlat
-    elif grid_type == 'GRID_CAR':
+    elif grid_type == "GRID_CAR":
         if nx_proc is None:
             nx_proc = 128
         if ny_proc is None:
@@ -216,16 +237,15 @@ def prepare_process(config, config_eq, State,
         if dy is None:
             dy = 10
     # Also resolve dlon/dlat from config_eq when grid_type_eq is GRID_GEO
-    if grid_type_eq == 'GRID_GEO' and dlon is None:
+    if grid_type_eq == "GRID_GEO" and dlon is None:
         dlon = config_eq.GRID.dlon
-    if grid_type_eq == 'GRID_GEO' and dlat is None:
+    if grid_type_eq == "GRID_GEO" and dlat is None:
         dlat = config_eq.GRID.dlat
 
     # Pre-compute latitude bands: (lat0, lat1, _ny, _nx_proc_band, _space_x_band, is_eq)
     lat_bands = []
     if space_window_size_proc_y is not None:
-        has_eq_band = (space_window_size_proc_y_eq is not None
-                       and config.GRID.lat_min < 0 and config.GRID.lat_max > 0)
+        has_eq_band = space_window_size_proc_y_eq is not None and config.GRID.lat_min < 0 and config.GRID.lat_max > 0
 
         if has_eq_band:
             _nx_eq = nx_proc_eq if nx_proc_eq is not None else nx_proc
@@ -293,29 +313,27 @@ def prepare_process(config, config_eq, State,
     # within the experiment time range [init_date, final_date].
     # When read_obs=False, skip the (potentially expensive) opening entirely
     # and rely on previously cached dict_obs / obs files on disk.
-    _same_obs = config_eq is config or getattr(config_eq, 'OBS', None) is getattr(config, 'OBS', None)
+    _same_obs = config_eq is config or getattr(config_eq, "OBS", None) is getattr(config, "OBS", None)
     if not _same_obs:
         try:
-            _same_obs = getattr(config_eq, 'OBS', None) == getattr(config, 'OBS', None)
+            _same_obs = getattr(config_eq, "OBS", None) == getattr(config, "OBS", None)
         except Exception:
             _same_obs = False
     if not read_obs:
-        print('[run_assimilation] read_obs=False: skipping obs dataset opening '
-              'and per-tile obs selection (using cached dict_obs if available).')
+        print(
+            "[run_assimilation] read_obs=False: skipping obs dataset opening "
+            "and per-tile obs selection (using cached dict_obs if available)."
+        )
         obs_datasets = {}
         obs_datasets_eq = {}
     else:
-        obs_datasets = _obs.open_obs_datasets(config,
-                                              date_start=init_date,
-                                              date_end=final_date)
+        obs_datasets = _obs.open_obs_datasets(config, date_start=init_date, date_end=final_date)
         # Reuse for config_eq when the OBS block is the same (same object or
         # equal dict) to avoid opening every file a second time.
         if _same_obs:
             obs_datasets_eq = obs_datasets
         else:
-            obs_datasets_eq = _obs.open_obs_datasets(config_eq,
-                                                     date_start=init_date,
-                                                     date_end=final_date)
+            obs_datasets_eq = _obs.open_obs_datasets(config_eq, date_start=init_date, date_end=final_date)
 
     # Tile-level spatial cache: spatial selection is the expensive step
     # (reads SWOT 2D lon/lat). Tile coordinates repeat across time windows,
@@ -350,11 +368,11 @@ def prepare_process(config, config_eq, State,
         while lon1 < config.GRID.lon_max and not flag_avoid_next_window:
             _nx = _nx_proc_band
             if _space_x_band is not None:
-                if _grid_type_config == 'GRID_GEO':
+                if _grid_type_config == "GRID_GEO":
                     lon0 = config.GRID.lon_min + n_wx * (_space_x_band - space_overlap_x)
                     lon1 = lon0 + _space_x_band
-                    if lon0 + _space_x_band/2 > config.GRID.lon_max:
-                        lon1 = lon0 + _space_x_band/2
+                    if lon0 + _space_x_band / 2 > config.GRID.lon_max:
+                        lon1 = lon0 + _space_x_band / 2
                     n_wx += 1
                 else:
                     if n_wx == 0:
@@ -366,10 +384,10 @@ def prepare_process(config, config_eq, State,
                             lon0 = lon_prev[-1, -1] - space_overlap_x
                     lon1 = lon0 + _space_x_band
                     _nx = _nx_proc_band
-                    if lon0 + _space_x_band/2 > config.GRID.lon_max:
-                        lon1 = lon0 + _space_x_band/2
+                    if lon0 + _space_x_band / 2 > config.GRID.lon_max:
+                        lon1 = lon0 + _space_x_band / 2
                         if _nx_proc_band is not None:
-                            _nx = int(_nx_proc_band/2)
+                            _nx = int(_nx_proc_band / 2)
                     n_wx += 1
             else:
                 lon0 = config.GRID.lon_min
@@ -389,12 +407,12 @@ def prepare_process(config, config_eq, State,
             tpl_cfg.GRID.lon_max = lon1
             tpl_cfg.GRID.lat_min = lat0
             tpl_cfg.GRID.lat_max = lat1
-            if _grid_type_config == 'GRID_GEO':
-                tpl_cfg.GRID.super = 'GRID_GEO'
+            if _grid_type_config == "GRID_GEO":
+                tpl_cfg.GRID.super = "GRID_GEO"
                 tpl_cfg.GRID.dlon = dlon
                 tpl_cfg.GRID.dlat = dlat
             else:
-                tpl_cfg.GRID.super = 'GRID_CAR'
+                tpl_cfg.GRID.super = "GRID_CAR"
                 tpl_cfg.GRID.nx = _nx
                 tpl_cfg.GRID.ny = _ny
                 tpl_cfg.GRID.dx = dx
@@ -403,8 +421,9 @@ def prepare_process(config, config_eq, State,
             _State = state.State(tpl_cfg, verbose=0)
 
             if np.any(_State.lon.max() > config.GRID.lon_max):
-                if (((lat0 + lat1) / 2 < 0 and np.any(_State.lon[-1] > config.GRID.lon_max))
-                        or ((lat0 + lat1) / 2 > 0 and np.any(_State.lon[0] > config.GRID.lon_max))):
+                if ((lat0 + lat1) / 2 < 0 and np.any(_State.lon[-1] > config.GRID.lon_max)) or (
+                    (lat0 + lat1) / 2 > 0 and np.any(_State.lon[0] > config.GRID.lon_max)
+                ):
                     flag_avoid_next_window = True
 
             lon_prev = +_State.lon
@@ -412,32 +431,37 @@ def prepare_process(config, config_eq, State,
                 _State.lon = _State.lon % 360
                 _State.lon_min = _State.lon.min()
                 _State.lon_max = _State.lon.max()
-                _State.lon_unit = '0_360'
+                _State.lon_unit = "0_360"
 
-            tile_geom_name = f'subwindow_{round((lon1+lon0)/2)}_{round((lat1+lat0)/2)}'
+            tile_geom_name = f"subwindow_{round((lon1+lon0)/2)}_{round((lat1+lat0)/2)}"
 
             if (lat0, lat1) != _prev_lat_band:
-                eq_tag = ' [EQ]' if is_eq else ''
-                print(f'\t ** Latitudes from {lat0:.2f} to {lat1:.2f} [{_ny}x{_nx}]{eq_tag}')
+                eq_tag = " [EQ]" if is_eq else ""
+                print(f"\t ** Latitudes from {lat0:.2f} to {lat1:.2f} [{_ny}x{_nx}]{eq_tag}")
                 _prev_lat_band = (lat0, lat1)
-            print(f'\t\t * Longitudes from {lon0:.2f} to {lon1:.2f}')
+            print(f"\t\t * Longitudes from {lon0:.2f} to {lon1:.2f}")
             list_lonlat.append(((lon1 + lon0) / 2, (lat1 + lat0) / 2))
 
-            tile_templates.append({
-                'lon0': lon0, 'lon1': lon1, 'lat0': lat0, 'lat1': lat1,
-                'is_eq': is_eq_tile,
-                'tpl_cfg': tpl_cfg,
-                'parent_config': parent_config,
-                'state': _State,
-                'geom_name': tile_geom_name,
-                # Original (un-mutated) parent paths used to derive per-window paths
-                'orig_tmp_DA_path': parent_config.EXP.tmp_DA_path,
-                'orig_path_save': parent_config.EXP.path_save,
-                'orig_path_save_control_vectors': parent_config.INV.path_save_control_vectors,
-                'orig_path_background': parent_config.INV.path_background,
-            })
+            tile_templates.append(
+                {
+                    "lon0": lon0,
+                    "lon1": lon1,
+                    "lat0": lat0,
+                    "lat1": lat1,
+                    "is_eq": is_eq_tile,
+                    "tpl_cfg": tpl_cfg,
+                    "parent_config": parent_config,
+                    "state": _State,
+                    "geom_name": tile_geom_name,
+                    # Original (un-mutated) parent paths used to derive per-window paths
+                    "orig_tmp_DA_path": parent_config.EXP.tmp_DA_path,
+                    "orig_path_save": parent_config.EXP.path_save,
+                    "orig_path_save_control_vectors": parent_config.INV.path_save_control_vectors,
+                    "orig_path_background": parent_config.INV.path_background,
+                }
+            )
     n_tiles = len(tile_templates)
-    print(f'Number of spatial tiles per time window: {n_tiles}')
+    print(f"Number of spatial tiles per time window: {n_tiles}")
 
     # =====================================================================
     # 2) Time loop: build per-window configs by cloning tile templates,
@@ -445,7 +469,7 @@ def prepare_process(config, config_eq, State,
     # =====================================================================
     def _select_tile_obs(tile_idx, tpl, _config, _State, date0, date1):
         """Per-tile obs selection (called from a thread pool)."""
-        is_eq_tile = tpl['is_eq']
+        is_eq_tile = tpl["is_eq"]
         _global_ds = obs_datasets_eq if is_eq_tile else obs_datasets
         _spatial_cache = _tile_obs_cache_eq if is_eq_tile else _tile_obs_cache
         _config_for_obs = config_eq if is_eq_tile else config
@@ -453,12 +477,9 @@ def prepare_process(config, config_eq, State,
         with _nc_lock:
             if tile_idx not in _spatial_cache:
                 _bbox_tile = _obs.compute_bbox(_config, _State)
-                _spatial_cache[tile_idx] = _obs.select_obs_datasets_space(
-                    _global_ds, _config_for_obs, _bbox_tile,
-                    lon_unit=_State.lon_unit)
+                _spatial_cache[tile_idx] = _obs.select_obs_datasets_space(_global_ds, _config_for_obs, _bbox_tile, lon_unit=_State.lon_unit)
             spatial_ds = _spatial_cache[tile_idx]
-            tile_ds = _obs.select_obs_datasets_time(
-                spatial_ds, _config_for_obs, date0, date1)
+            tile_ds = _obs.select_obs_datasets_time(spatial_ds, _config_for_obs, date0, date1)
             _obs.Obs(_config, _State, obs_datasets=tile_ds)
 
     date1 = init_date
@@ -485,12 +506,12 @@ def prepare_process(config, config_eq, State,
         list_date_end.append(date1)
         list_date_middle.append(date0 + (date1 - date0) / 2)
         date_middle_str = str(list_date_middle[-1])[:10]
-        print(f'*** Time window: {date0} -> {date1}')
+        print(f"*** Time window: {date0} -> {date1}")
 
         # Build per-window configs from tile templates
         window_configs = []
         for tile_idx, tpl in enumerate(tile_templates):
-            _config = tpl['tpl_cfg'].copy()
+            _config = tpl["tpl_cfg"].copy()
             _config.EXP = _config.EXP.copy()
             _config.GRID = _config.GRID.copy()
             _config.MOD = _config.MOD.copy()
@@ -507,7 +528,7 @@ def prepare_process(config, config_eq, State,
             # time window. Use a shallow copy so we don't mutate the
             # template state (which is reused for the next time window /
             # picked up by other already-launched workers).
-            _State = _copy.copy(tpl['state'])
+            _State = _copy.copy(tpl["state"])
             _State.path_save = _config.EXP.path_save
             _State.tmp_DA_path = _config.EXP.tmp_DA_path
             # Also re-point self.config so that State.copy() (called inside
@@ -519,35 +540,37 @@ def prepare_process(config, config_eq, State,
             # as: "did not find a match in any of xarray's currently
             # installed IO backends".
             _State.config = _config
-            if tpl['orig_path_save_control_vectors'] is not None:
-                _config.INV.path_save_control_vectors = (
-                    f'{tpl["orig_path_save_control_vectors"]}/{name_subwindow}')
-            if tpl['orig_path_background'] is not None:
-                _config.INV.path_background = (
-                    f'{tpl["orig_path_background"]}/{name_subwindow}')
+            if tpl["orig_path_save_control_vectors"] is not None:
+                _config.INV.path_save_control_vectors = f'{tpl["orig_path_save_control_vectors"]}/{name_subwindow}'
+            if tpl["orig_path_background"] is not None:
+                _config.INV.path_background = f'{tpl["orig_path_background"]}/{name_subwindow}'
 
             # Init from file from previous window
             if n_wt > 1 and flag_init_from_previous:
-                name_prev_subwindow = (
-                    f'subwindow_{str(list_date_middle[-2])[:10]}/{tpl["geom_name"]}')
-                path_output = config.EXP.path_save + f'/{name_prev_subwindow}/'
+                name_prev_subwindow = f'subwindow_{str(list_date_middle[-2])[:10]}/{tpl["geom_name"]}'
+                path_output = config.EXP.path_save + f"/{name_prev_subwindow}/"
                 filename = os.path.join(
                     path_output,
-                    f'{State.name_exp_save}'
-                    f'_y{date0.year}'
-                    f'm{str(date0.month).zfill(2)}'
-                    f'd{str(date0.day).zfill(2)}'
-                    f'h{str(date0.hour).zfill(2)}'
-                    f'm{str(date0.minute).zfill(2)}.nc')
-                _base_config = tpl['parent_config']
-                _config.GRID = exp.Config({
-                    'super': 'GRID_FROM_FILE',
-                    'path_init_grid': filename,
-                    'name_init_lon': 'lon', 'name_init_lat': 'lat',
-                    'name_init_mask': _base_config.GRID.name_init_mask,
-                    'name_var_mask': _base_config.GRID.name_var_mask,
-                    'subsampling': None})
-                if 'super' not in _config.MOD:
+                    f"{State.name_exp_save}"
+                    f"_y{date0.year}"
+                    f"m{str(date0.month).zfill(2)}"
+                    f"d{str(date0.day).zfill(2)}"
+                    f"h{str(date0.hour).zfill(2)}"
+                    f"m{str(date0.minute).zfill(2)}.nc",
+                )
+                _base_config = tpl["parent_config"]
+                _config.GRID = exp.Config(
+                    {
+                        "super": "GRID_FROM_FILE",
+                        "path_init_grid": filename,
+                        "name_init_lon": "lon",
+                        "name_init_lat": "lat",
+                        "name_init_mask": _base_config.GRID.name_init_mask,
+                        "name_var_mask": _base_config.GRID.name_var_mask,
+                        "subsampling": None,
+                    }
+                )
+                if "super" not in _config.MOD:
                     for NAME_MOD in _config.MOD:
                         _config.MOD[NAME_MOD] = _base_config.MOD[NAME_MOD].copy()
                         _config.MOD[NAME_MOD].init_from_bc = False
@@ -555,14 +578,12 @@ def prepare_process(config, config_eq, State,
                     _config.MOD.init_from_bc = False
 
             if flag_init and name_exp_init is not None:
-                path_control_init = _config.INV.path_save_control_vectors.replace(
-                    config.EXP.name_experiment, name_exp_init)
-                _config.INV.path_init_4Dvar = os.path.join(path_control_init, 'Xres.nc')
+                path_control_init = _config.INV.path_save_control_vectors.replace(config.EXP.name_experiment, name_exp_init)
+                _config.INV.path_init_4Dvar = os.path.join(path_control_init, "Xres.nc")
 
             if flag_background and name_exp_background is not None:
-                path_background = _config.INV.path_background.replace(
-                    config.EXP.name_experiment, name_exp_background)
-                _config.INV.path_background = os.path.join(path_background, 'Xres.nc')
+                path_background = _config.INV.path_background.replace(config.EXP.name_experiment, name_exp_background)
+                _config.INV.path_background = os.path.join(path_background, "Xres.nc")
 
             # makedirs (sequential, fast)
             if not os.path.exists(_config.EXP.tmp_DA_path):
@@ -573,7 +594,7 @@ def prepare_process(config, config_eq, State,
             list_config[i].append(_config)
             list_State[i].append(_State)
             if i == 0 and dir_save_pickle is not None:
-                list_tile_paths.append(f'{path_save_pickle}/{name_subwindow}')
+                list_tile_paths.append(f"{path_save_pickle}/{name_subwindow}")
 
             if config.OBS is not None:
                 _config.EXP.write_obs = True
@@ -596,7 +617,7 @@ def prepare_process(config, config_eq, State,
             # Disable recomputation in subprocesses (now that cache is on disk)
             for _, _, _config, _ in window_configs:
                 _config.EXP.compute_obs = False
-                if hasattr(_config, 'OBSOP') and _config.OBSOP is not None:
+                if hasattr(_config, "OBSOP") and _config.OBSOP is not None:
                     _config.OBSOP = _config.OBSOP.copy()
                     _config.OBSOP.compute_op = False
 
@@ -606,27 +627,25 @@ def prepare_process(config, config_eq, State,
             name_subwindow = f'subwindow_{date_middle_str}/{tpl["geom_name"]}'
             iproc_tw += 1
             if dir_save_pickle is not None:
-                path_pickle = f'{path_save_pickle}/{name_subwindow}'
+                path_pickle = f"{path_save_pickle}/{name_subwindow}"
                 if not os.path.exists(path_pickle):
                     os.makedirs(path_pickle)
-                with open(f'{path_pickle}/state.pkl', 'wb') as f:
+                with open(f"{path_pickle}/state.pkl", "wb") as f:
                     pickle.dump(_State, f)
-                with open(f'{path_pickle}/config.pkl', 'wb') as f:
+                with open(f"{path_pickle}/config.pkl", "wb") as f:
                     pickle.dump(_config, f)
 
-            if flag_assim and (flag_assim_restart
-                               or not os.path.exists(f'{_config.INV.path_save_control_vectors}/Xres.nc')):
-                worker = partial(inv.Inv_4Dvar, config=_config, State=_State,
-                                 verbose=0)
+            if flag_assim and (flag_assim_restart or not os.path.exists(f"{_config.INV.path_save_control_vectors}/Xres.nc")):
+                worker = partial(inv.Inv_4Dvar, config=_config, State=_State, verbose=0)
                 if flag_init_from_previous:
                     list_processes[i].append(worker)
                 else:
                     list_processes[0].append(worker)
             elif i == 0:
                 if not flag_assim_restart:
-                    print('Assimilation already done for this subwindow, skipping (use flag_assim_restart=True to re-run)')
+                    print("Assimilation already done for this subwindow, skipping (use flag_assim_restart=True to re-run)")
                 if not flag_assim:
-                    print('Assimilation not requested for this subwindow, skipping (use flag_assim=True to run)')
+                    print("Assimilation not requested for this subwindow, skipping (use flag_assim=True to run)")
 
         iproc += iproc_tw
 
@@ -634,14 +653,20 @@ def prepare_process(config, config_eq, State,
             lonlat_grid = [(_S.lon, _S.lat) for _S in list_State[0]]
             plot_subdomains(lonlat_grid)
             weights_space, weights_space_sum, interpolators = compute_weights_map(
-                State, list_State, path_save_pickle=path_save_pickle,
+                State,
+                list_State,
+                path_save_pickle=path_save_pickle,
                 list_tile_paths=list_tile_paths or None,
-                space_overlap_x=space_overlap_x, space_overlap_y=space_overlap_y,
-                lon_min=config.GRID.lon_min, lon_max=config.GRID.lon_max,
-                lat_min=config.GRID.lat_min, lat_max=config.GRID.lat_max)
+                space_overlap_x=space_overlap_x,
+                space_overlap_y=space_overlap_y,
+                lon_min=config.GRID.lon_min,
+                lon_max=config.GRID.lon_max,
+                lat_min=config.GRID.lat_min,
+                lat_max=config.GRID.lat_max,
+            )
             plot_weights(State, weights_space_sum)
 
-    print(f'Number of tiles: {iproc} ({iproc_tw} per time window)')
+    print(f"Number of tiles: {iproc} ({iproc_tw} per time window)")
 
     # Close pre-opened obs datasets
     for _ds_dict in (obs_datasets, obs_datasets_eq):
@@ -659,39 +684,57 @@ def prepare_process(config, config_eq, State,
 
     # Save global pickles
     if path_save_pickle is not None:
-        with open(f'{path_save_pickle}/config.pkl', 'wb') as f:
+        with open(f"{path_save_pickle}/config.pkl", "wb") as f:
             pickle.dump(config, f)
-        with open(f'{path_save_pickle}/State.pkl', 'wb') as f:
+        with open(f"{path_save_pickle}/State.pkl", "wb") as f:
             pickle.dump(State, f)
-        with open(f'{path_save_pickle}/dates.pkl', 'wb') as f:
+        with open(f"{path_save_pickle}/dates.pkl", "wb") as f:
             pickle.dump((list_date_start, list_date_middle, list_date_end), f)
-        with open(f'{path_save_pickle}/list_State.pkl', 'wb') as f:
+        with open(f"{path_save_pickle}/list_State.pkl", "wb") as f:
             pickle.dump(list_State, f)
 
-    return list_processes, list_config, list_State, list_date_start, list_date_end, list_date_middle, list_lonlat, \
-           weights_space, weights_space_sum, interpolators
+    return (
+        list_processes,
+        list_config,
+        list_State,
+        list_date_start,
+        list_date_end,
+        list_date_middle,
+        list_lonlat,
+        weights_space,
+        weights_space_sum,
+        interpolators,
+    )
 
-def compute_weights_map(State, list_State, path_save_pickle=None,
-                        list_tile_paths=None,
-                        space_overlap_x=2, space_overlap_y=2,
-                        lon_min=None, lon_max=None, lat_min=None, lat_max=None,
-                        taper_factor=1.0):
 
+def compute_weights_map(
+    State,
+    list_State,
+    path_save_pickle=None,
+    list_tile_paths=None,
+    space_overlap_x=2,
+    space_overlap_y=2,
+    lon_min=None,
+    lon_max=None,
+    lat_min=None,
+    lat_max=None,
+    taper_factor=1.0,
+):
     """Compute weights maps and precomputed interpolation operators for merging outputs from subprocesses.
-    
+
     Weights use smootherstep tapering based on per-row (longitude) and per-column
-    (latitude) distance from tile edges. This correctly handles GRID_CAR tiles whose 
+    (latitude) distance from tile edges. This correctly handles GRID_CAR tiles whose
     shape is trapezoidal in lon/lat space. No tapering is applied on sides that lie
     at the domain boundary. After interpolation, weights are normalized so that the
     sum is exactly 1.0 everywhere, compensating for varying overlap widths.
-    
+
     Interpolation operators are precomputed once per subwindow and reused for all dates,
     avoiding the expensive Delaunay triangulation of griddata at every time step.
-    
+
     When list_tile_paths is provided, each tile's weight map and interpolator are saved
     individually to '{tile_path}/weights.pkl' and freed from memory. Only weights_space_sum
     is kept in memory. This avoids OOM when pickling 100+ tiles at once.
-    
+
     Parameters
     ----------
     State : State
@@ -710,7 +753,7 @@ def compute_weights_map(State, list_State, path_save_pickle=None,
     space_overlap_y : float, optional
         Overlap in y direction in degrees (default: 2).
     lon_min, lon_max : float, optional
-        Domain boundaries in longitude. Tiles touching these boundaries 
+        Domain boundaries in longitude. Tiles touching these boundaries
         are not tapered on that side. If None, all sides are tapered.
     lat_min, lat_max : float, optional
         Domain boundaries in latitude. Same behavior as lon_min/lon_max.
@@ -718,7 +761,7 @@ def compute_weights_map(State, list_State, path_save_pickle=None,
         Multiplier for the taper width relative to the overlap distance (default: 1.0).
         A value of 1.0 ensures the taper zone exactly matches the overlap,
         giving a uniform weight sum of 1.0 via smootherstep symmetry S(t)+S(1-t)=1.
-    
+
     Returns
     -------
     weights_space : list of 2D arrays or None
@@ -735,8 +778,8 @@ def compute_weights_map(State, list_State, path_save_pickle=None,
     weights_space_sum = np.zeros((State.ny, State.nx))
     interpolators = [] if list_tile_paths is None else None
 
-    single_subwindow = (len(list_State[0]) == 1)
-    
+    single_subwindow = len(list_State[0]) == 1
+
     lon_out = State.lon
     lat_out = State.lat
 
@@ -767,8 +810,7 @@ def compute_weights_map(State, list_State, path_save_pickle=None,
             # leftmost/rightmost tiles must NOT taper toward the hard boundary,
             # otherwise weights_space_sum collapses to ~0 there.
             tol = 0.5  # tolerance in degrees for boundary detection
-            global_lon = (lon_min is not None and lon_max is not None
-                          and (lon_max - lon_min) >= 360 - tol)
+            global_lon = lon_min is not None and lon_max is not None and (lon_max - lon_min) >= 360 - tol
             at_west = np.zeros((_State.ny, 1), dtype=bool)
             at_east = np.zeros((_State.ny, 1), dtype=bool)
             at_south = np.zeros((1, _State.nx), dtype=bool)
@@ -780,7 +822,7 @@ def compute_weights_map(State, list_State, path_save_pickle=None,
             # so it will NOT match either domain boundary — correct.
             _lon_west_cmp = _lon[:, 0]
             _lon_east_cmp = _lon[:, -1]
-            if getattr(_State, 'lon_unit', None) == '0_360' and lon_max is not None and lon_max <= 180:
+            if getattr(_State, "lon_unit", None) == "0_360" and lon_max is not None and lon_max <= 180:
                 _lon_west_cmp = ((_lon_west_cmp + 180) % 360) - 180
                 _lon_east_cmp = ((_lon_east_cmp + 180) % 360) - 180
             if lon_min is not None and not global_lon:
@@ -805,7 +847,7 @@ def compute_weights_map(State, list_State, path_save_pickle=None,
                 return t * t * t * (t * (t * 6 - 15) + 10)
 
             _weights_space = _smootherstep(wx_west) * _smootherstep(wx_east) * _smootherstep(wy_south) * _smootherstep(wy_north)
-        
+
         lon_in = _State.lon
         lat_in = _State.lat
 
@@ -824,9 +866,8 @@ def compute_weights_map(State, list_State, path_save_pickle=None,
         else:
             # Build interpolation operator (precomputed, reused for all dates)
             _interp_func, _weights_space_interp = _build_interpolator(
-                lon_in, lat_in, _weights_space, lon_out, lat_out,
-                _State.lon_unit, State.lon_unit, State.ny, State.nx,
-                _State.geo_grid)
+                lon_in, lat_in, _weights_space, lon_out, lat_out, _State.lon_unit, State.lon_unit, State.ny, State.nx, _State.geo_grid
+            )
 
         ind = ~np.isnan(_weights_space_interp)
         weights_space_sum[ind] += _weights_space_interp[ind]
@@ -834,9 +875,8 @@ def compute_weights_map(State, list_State, path_save_pickle=None,
         if list_tile_paths is not None:
             # Save per-tile and free memory immediately
             tile_path = list_tile_paths[itile]
-            with open(f'{tile_path}/weights.pkl', 'wb') as f:
-                pickle.dump({'weights_space': _weights_space_interp,
-                             'interpolator': _interp_func}, f)
+            with open(f"{tile_path}/weights.pkl", "wb") as f:
+                pickle.dump({"weights_space": _weights_space_interp, "interpolator": _interp_func}, f)
             del _interp_func, _weights_space_interp
         else:
             interpolators.append(_interp_func)
@@ -845,15 +885,15 @@ def compute_weights_map(State, list_State, path_save_pickle=None,
     if path_save_pickle is not None:
         if not os.path.exists(path_save_pickle):
             os.makedirs(path_save_pickle)
-        with open(f'{path_save_pickle}/weights.pkl', 'wb') as f:
-            pickle.dump({'weights_space_sum': weights_space_sum,
-                         'list_tile_paths': list_tile_paths}, f)
+        with open(f"{path_save_pickle}/weights.pkl", "wb") as f:
+            pickle.dump({"weights_space_sum": weights_space_sum, "list_tile_paths": list_tile_paths}, f)
 
     return weights_space, weights_space_sum, interpolators
 
 
 class _RegularInterpolator:
     """Picklable regular grid interpolator."""
+
     def __init__(self, lat_1d, lon_1d, pts, ny_out, nx_out):
         self.lat_1d = lat_1d
         self.lon_1d = lon_1d
@@ -862,13 +902,13 @@ class _RegularInterpolator:
         self.nx_out = nx_out
 
     def __call__(self, var_2d):
-        rgi = RegularGridInterpolator((self.lat_1d, self.lon_1d), var_2d,
-                                      method='linear', bounds_error=False, fill_value=np.nan)
+        rgi = RegularGridInterpolator((self.lat_1d, self.lon_1d), var_2d, method="linear", bounds_error=False, fill_value=np.nan)
         return rgi(self.pts).reshape(self.ny_out, self.nx_out)
 
 
 class _IrregularInterpolator:
     """Picklable irregular grid interpolator using precomputed Delaunay triangulation."""
+
     def __init__(self, tri, pts_out, ny_out, nx_out):
         self.tri = tri
         self.pts_out = pts_out
@@ -882,6 +922,7 @@ class _IrregularInterpolator:
 
 class _SplitInterpolator:
     """Picklable interpolator for longitude-wrapping grids."""
+
     def __init__(self, ind_0, ind_1, tri_0, tri_1, pts_out, ny_out, nx_out):
         self.ind_0 = ind_0
         self.ind_1 = ind_1
@@ -899,17 +940,15 @@ class _SplitInterpolator:
         return np.where(np.isnan(r0), r1, r0)
 
 
-def _build_interpolator(lon_in, lat_in, values, lon_out, lat_out, 
-                        lon_unit_in, lon_unit_out, ny_out, nx_out, geo_grid):
+def _build_interpolator(lon_in, lat_in, values, lon_out, lat_out, lon_unit_in, lon_unit_out, ny_out, nx_out, geo_grid):
     """Build a reusable interpolation operator from a subwindow grid to the target grid.
-    
+
     For regular (GRID_GEO) grids, uses RegularGridInterpolator (fast structured interpolation).
     For irregular (GRID_CAR) grids, precomputes a LinearNDInterpolator (Delaunay triangulation done once).
-    
+
     Returns a callable interp_func(values_2d) -> interpolated_2d and the interpolated input values.
     """
-    needs_lon_split = (lon_unit_in != lon_unit_out and lon_unit_out == '-180_180' 
-                       and (lon_in.max() > 180 or lon_in.min() < -180))
+    needs_lon_split = lon_unit_in != lon_unit_out and lon_unit_out == "-180_180" and (lon_in.max() > 180 or lon_in.min() < -180)
 
     if not needs_lon_split:
         if geo_grid:
@@ -929,10 +968,10 @@ def _build_interpolator(lon_in, lat_in, values, lon_out, lat_out,
     else:
         # Longitude wrapping: split into two halves
         pts_out = np.column_stack([lon_out.ravel(), lat_out.ravel()])
-        
+
         ind_0 = lon_in <= 180
         points_0 = np.column_stack([lon_in[ind_0].ravel(), lat_in[ind_0].ravel()])
-        
+
         ind_1 = lon_in > 180
         lon_in_1 = (lon_in[ind_1] + 180) % 360 - 180
         lat_in_1 = lat_in[ind_1]
@@ -950,43 +989,45 @@ def _build_interpolator(lon_in, lat_in, values, lon_out, lat_out,
 
     return interp_func, values_interp
 
+
 def plot_weights(State, weights_space_sum):
     """Plot the weights_space_sum on a map with coastlines."""
 
-    fig, ax = plt.subplots(figsize=(15, 6), subplot_kw={'projection': ccrs.PlateCarree()})
+    fig, ax = plt.subplots(figsize=(15, 6), subplot_kw={"projection": ccrs.PlateCarree()})
 
     im = ax.pcolormesh(State.lon, State.lat, weights_space_sum, transform=ccrs.PlateCarree(), cmap=cm.viridis)
     plt.colorbar(im, ax=ax, label="Weight sum")
 
     ax.set_global()
     ax.coastlines()
-    ax.add_feature(cfeature.BORDERS, linestyle=':')
-    ax.add_feature(cfeature.LAND, edgecolor='black')
+    ax.add_feature(cfeature.BORDERS, linestyle=":")
+    ax.add_feature(cfeature.LAND, edgecolor="black")
 
-    gl = ax.gridlines(draw_labels=True, linestyle='--', linewidth=0.5)
+    gl = ax.gridlines(draw_labels=True, linestyle="--", linewidth=0.5)
     gl.top_labels = False
     gl.right_labels = False
 
     # Savefigure
-    plt.savefig('weights_space_sum.png', dpi=300, bbox_inches='tight')
+    plt.savefig("weights_space_sum.png", dpi=300, bbox_inches="tight")
 
     plt.show()
 
+
 def plot_subdomains(lonlat_grid):
 
-    dxdy_grid = [grid.lonlat2dxdy(lon,lat) for (lon,lat) in lonlat_grid]
-    dxdy = [(np.mean(_dx)*1e-3, np.mean(_dy)*1e-3) for _dx,_dy in dxdy_grid]
+    dxdy_grid = [grid.lonlat2dxdy(lon, lat) for (lon, lat) in lonlat_grid]
+    dxdy = [(np.mean(_dx) * 1e-3, np.mean(_dy) * 1e-3) for _dx, _dy in dxdy_grid]
 
-    def plot_lonlat(ax, lonlat_grid, dx=10, alpha_value=.3, norm=None, cmap=cm.viridis):
+    def plot_lonlat(ax, lonlat_grid, dx=10, alpha_value=0.3, norm=None, cmap=cm.viridis):
 
-        lon_grid,lat_grid = lonlat_grid 
+        lon_grid, lat_grid = lonlat_grid
 
         color = cmap(norm(dx))  # Get normalized color
         color_with_alpha = (*color[:3], alpha_value)  # Convert to RGBA
 
         # Bring corner longitudes back to [-180, 180].
-        lons = np.array([lon_grid[0,0], lon_grid[0,-1], lon_grid[-1,-1], lon_grid[-1,0]])
-        lats = np.array([lat_grid[0,0], lat_grid[0,-1], lat_grid[-1,-1], lat_grid[-1,0]])
+        lons = np.array([lon_grid[0, 0], lon_grid[0, -1], lon_grid[-1, -1], lon_grid[-1, 0]])
+        lats = np.array([lat_grid[0, 0], lat_grid[0, -1], lat_grid[-1, -1], lat_grid[-1, 0]])
         lons = ((lons + 180) % 360) - 180
 
         # If the tile straddles the dateline, split into two polygons (one on
@@ -1004,15 +1045,16 @@ def plot_subdomains(lonlat_grid):
             polys = [Polygon(np.column_stack([lons, lats]))]
 
         # Add the polygon(s) to GeoAxes
-        ax.add_feature(ShapelyFeature(polys, ccrs.PlateCarree(), edgecolor='black', facecolor=color_with_alpha, linewidth=2))
+        ax.add_feature(ShapelyFeature(polys, ccrs.PlateCarree(), edgecolor="black", facecolor=color_with_alpha, linewidth=2))
 
     # Create a figure and an axis with PlateCarree projection
-    fig, ax = plt.subplots(figsize=(15, 6), subplot_kw={'projection': ccrs.PlateCarree()})
+    fig, ax = plt.subplots(figsize=(15, 6), subplot_kw={"projection": ccrs.PlateCarree()})
 
     norm = mcolors.Normalize(vmin=5, vmax=10)
     cmap = cm.viridis  # Choose colormap (e.g., 'viridis', 'jet', 'plasma', etc.)
 
-    for _dx, lonlat in zip(dxdy,lonlat_grid): plot_lonlat(ax, lonlat, dx=_dx[0], norm=norm, cmap=cmap) 
+    for _dx, lonlat in zip(dxdy, lonlat_grid):
+        plot_lonlat(ax, lonlat, dx=_dx[0], norm=norm, cmap=cmap)
 
     # Add colorbar
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)  # Create ScalarMappable
@@ -1022,19 +1064,20 @@ def plot_subdomains(lonlat_grid):
     # Add features
     ax.set_global()
     ax.coastlines()
-    ax.add_feature(cfeature.BORDERS, linestyle=':')
-    ax.add_feature(cfeature.LAND, edgecolor='black')
+    ax.add_feature(cfeature.BORDERS, linestyle=":")
+    ax.add_feature(cfeature.LAND, edgecolor="black")
 
     # Add gridlines
-    gl = ax.gridlines(draw_labels=True, linestyle='--', linewidth=0.5)
+    gl = ax.gridlines(draw_labels=True, linestyle="--", linewidth=0.5)
     gl.top_labels = False  # Remove top labels
     gl.right_labels = False  # Remove right labels
 
     # Save figure
-    plt.savefig('subdomains.png', dpi=300, bbox_inches='tight')
+    plt.savefig("subdomains.png", dpi=300, bbox_inches="tight")
 
     # Show the plot
     plt.show()
+
 
 # Per-worker cache for tile weight/interpolator pickles. Each worker process
 # in mp.Pool gets its own module import, so this dict is naturally per-worker.
@@ -1046,7 +1089,7 @@ def _load_tile_weights(tile_path):
     cached = _TILE_WEIGHTS_CACHE.get(tile_path)
     if cached is not None:
         return cached
-    with open(f'{tile_path}/weights.pkl', 'rb') as f:
+    with open(f"{tile_path}/weights.pkl", "rb") as f:
         data = pickle.load(f)
     _TILE_WEIGHTS_CACHE[tile_path] = data
     return data
@@ -1068,13 +1111,24 @@ def _fill_nans_nearest(arr):
     return arr[tuple(idx)]
 
 
-def merge_output_date(date, State, list_State, name_var_save, kernel, weights_space, weights_space_sum, interpolators, list_tile_paths=None, plot=False, save=True):
-
+def merge_output_date(
+    date,
+    State,
+    list_State,
+    name_var_save,
+    kernel,
+    weights_space,
+    weights_space_sum,
+    interpolators,
+    list_tile_paths=None,
+    plot=False,
+    save=True,
+):
     """Merge outputs from subprocesses for a given date.
-    
+
     Uses precomputed interpolation operators (from compute_weights_map) to avoid
     recomputing Delaunay triangulations at every time step.
-    
+
     When list_tile_paths is provided, weights and interpolators are loaded
     per-tile from '{tile_path}/weights.pkl' instead of from in-memory lists.
     Pickle files are cached per worker process to avoid re-reading them for
@@ -1096,14 +1150,14 @@ def merge_output_date(date, State, list_State, name_var_save, kernel, weights_sp
     inv_wsum[~no_coverage] = 1.0 / weights_space_sum[~no_coverage]
 
     dict_var = {name: np.zeros((ny, nx)) for name in name_var_save}
-        
+
     for i, _State in enumerate(list_State):
 
         # Load weights/interpolator: per-tile from disk (cached) or from in-memory lists
         if list_tile_paths is not None:
             tile_data = _load_tile_weights(list_tile_paths[i])
-            _weights_space = tile_data['weights_space']
-            _interp_func = tile_data['interpolator']
+            _weights_space = tile_data["weights_space"]
+            _interp_func = tile_data["interpolator"]
         else:
             _weights_space = weights_space[i]
             _interp_func = interpolators[i]
@@ -1119,7 +1173,7 @@ def merge_output_date(date, State, list_State, name_var_save, kernel, weights_sp
             for name in name_var_save:
 
                 _var = _ds[name].values
-                
+
                 # Handle C-grid staggering: average U/V-grid variables to H-grid
                 if _var.shape == (_State.ny, _State.nx + 1):
                     # U-grid → H-grid: average adjacent columns
@@ -1127,11 +1181,11 @@ def merge_output_date(date, State, list_State, name_var_save, kernel, weights_sp
                 elif _var.shape == (_State.ny + 1, _State.nx):
                     # V-grid → H-grid: average adjacent rows
                     _var = 0.5 * (_var[:-1, :] + _var[1:, :])
-                
+
                 # Fill NaN gaps near coasts before interpolation (fast EDT-based nearest-neighbour fill)
                 if np.any(np.isnan(_var)):
                     _var = _fill_nans_nearest(_var)
-                
+
                 # Interpolate using precomputed operator
                 if _interp_func is not None:
                     _var_interp = _interp_func(_var)
@@ -1142,11 +1196,11 @@ def merge_output_date(date, State, list_State, name_var_save, kernel, weights_sp
                 # Merge (safe division: 0 where no coverage)
                 ind = ~np.isnan(_var_interp)
                 dict_var[name][ind] += (_weights_space * _var_interp * inv_wsum)[ind]
-            
+
             _ds.close()
             del _ds
         except Exception as e:
-            print(f'[merge_output_date] Warning: failed to merge subwindow for date {date}: {e}')
+            print(f"[merge_output_date] Warning: failed to merge subwindow for date {date}: {e}")
             continue
 
     for name in name_var_save:
@@ -1163,10 +1217,11 @@ def merge_output_date(date, State, list_State, name_var_save, kernel, weights_sp
                 plt.title(date)
                 plt.show()
         State0.setvar(dict_var[name], name)
-    
+
     if save:
         State0.save_output(date, name_var=name_var_save)
-    
+
+
 def generate_dates(start_date, end_date, delta):
     """Generate a list of dates between start_date and end_date with a given timedelta."""
     dates = []
@@ -1176,7 +1231,10 @@ def generate_dates(start_date, end_date, delta):
         current_date += delta
     return dates
 
-def parallel_merge(dates, State, list_State, name_var_save, kernel, weights_space, weights_space_sum, interpolators, list_tile_paths=None, num_workers=4):
+
+def parallel_merge(
+    dates, State, list_State, name_var_save, kernel, weights_space, weights_space_sum, interpolators, list_tile_paths=None, num_workers=4
+):
     """Merge outputs from subprocesses in parallel for a list of dates.
 
     When ``list_tile_paths`` is provided, uses a tile-partitioned worker pool:
@@ -1189,7 +1247,17 @@ def parallel_merge(dates, State, list_State, name_var_save, kernel, weights_spac
 
     if num_workers <= 1:
         for date in dates:
-            merge_output_date(date, State, list_State, name_var_save, kernel, weights_space, weights_space_sum, interpolators, list_tile_paths=list_tile_paths)
+            merge_output_date(
+                date,
+                State,
+                list_State,
+                name_var_save,
+                kernel,
+                weights_space,
+                weights_space_sum,
+                interpolators,
+                list_tile_paths=list_tile_paths,
+            )
         return
 
     # Fall back to old per-date pool when tiles are kept in memory (no pickle path).
@@ -1197,7 +1265,7 @@ def parallel_merge(dates, State, list_State, name_var_save, kernel, weights_spac
         with mp.Pool(processes=num_workers) as pool:
             pool.starmap(
                 merge_output_date,
-                [(date, State, list_State, name_var_save, kernel, weights_space, weights_space_sum, interpolators, None) for date in dates]
+                [(date, State, list_State, name_var_save, kernel, weights_space, weights_space_sum, interpolators, None) for date in dates],
             )
         return
 
@@ -1222,16 +1290,24 @@ def parallel_merge(dates, State, list_State, name_var_save, kernel, weights_spac
         parts_paths[i % nw].append(p)
         parts_states[i % nw].append(s)
 
-    ctx = mp.get_context('spawn')
+    ctx = mp.get_context("spawn")
     task_qs = [ctx.Queue() for _ in range(nw)]
     result_qs = [ctx.Queue() for _ in range(nw)]
     procs = []
     for k in range(nw):
         p = ctx.Process(
             target=_merge_worker_loop,
-            args=(parts_paths[k], parts_states[k], name_var_save,
-                  State.ny, State.nx, weights_space_sum,
-                  task_qs[k], result_qs[k], direct_copy_single_tile),
+            args=(
+                parts_paths[k],
+                parts_states[k],
+                name_var_save,
+                State.ny,
+                State.nx,
+                weights_space_sum,
+                task_qs[k],
+                result_qs[k],
+                direct_copy_single_tile,
+            ),
             daemon=False,
         )
         p.start()
@@ -1251,10 +1327,10 @@ def parallel_merge(dates, State, list_State, name_var_save, kernel, weights_spac
             for k, q in enumerate(result_qs):
                 result = q.get()
                 if result is None:
-                    raise RuntimeError(f'merge worker {k} died on date {date}')
+                    raise RuntimeError(f"merge worker {k} died on date {date}")
                 for n in name_var_save:
-                    dict_var[n] += result['contrib'][n]
-                    total_missing_weight[n] += result['missing_weight'][n]
+                    dict_var[n] += result["contrib"][n]
+                    total_missing_weight[n] += result["missing_weight"][n]
 
             try:
                 State0 = _copy.copy(State)
@@ -1266,9 +1342,9 @@ def parallel_merge(dates, State, list_State, name_var_save, kernel, weights_spac
                         dict_var[n][State0.mask] = np.nan
                     State0.setvar(dict_var[n], n)
                 State0.save_output(date, name_var=name_var_save)
-                print(f'[parallel_merge] {date} done', flush=True)
+                print(f"[parallel_merge] {date} done", flush=True)
             except Exception as e:
-                print(f'[parallel_merge] WARNING: failed to save output for {date}: {e}', flush=True)
+                print(f"[parallel_merge] WARNING: failed to save output for {date}: {e}", flush=True)
     finally:
         for q in task_qs:
             try:
@@ -1281,14 +1357,12 @@ def parallel_merge(dates, State, list_State, name_var_save, kernel, weights_spac
                 p.terminate()
 
 
-def _merge_worker_loop(tile_paths, states, name_var_save, ny, nx,
-                       weights_space_sum, task_q, result_q,
-                       direct_copy_single_tile=False):
+def _merge_worker_loop(tile_paths, states, name_var_save, ny, nx, weights_space_sum, task_q, result_q, direct_copy_single_tile=False):
     """Worker: load assigned tiles once, then process dates sent via task_q."""
     try:
         tiles = [_load_tile_weights(p) for p in tile_paths]
     except Exception as e:
-        print(f'[merge worker] failed to load tiles: {e}', flush=True)
+        print(f"[merge worker] failed to load tiles: {e}", flush=True)
         try:
             result_q.put(None)
         except Exception:
@@ -1318,12 +1392,12 @@ def _merge_worker_loop(tile_paths, states, name_var_save, ny, nx,
                 _weights_space = np.ones((ny, nx))
                 _interp_func = None
             else:
-                _weights_space = tile_data['weights_space']
-                _interp_func = tile_data['interpolator']
+                _weights_space = tile_data["weights_space"]
+                _interp_func = tile_data["interpolator"]
             try:
                 _ds = _State.load_output(date)
             except Exception as e:
-                print(f'[merge worker] tile failed for {date}: {e}', flush=True)
+                print(f"[merge worker] tile failed for {date}: {e}", flush=True)
                 # Accumulate the fractional weight this tile would have contributed
                 # so the main process can mark those cells NaN instead of 0.
                 for n in name_var_save:
@@ -1347,7 +1421,7 @@ def _merge_worker_loop(tile_paths, states, name_var_save, ny, nx,
                         ind = ~np.isnan(_var_interp)
                         contrib[name][ind] += (_weights_space * _var_interp * inv_wsum)[ind]
                     except Exception as e:
-                        print(f'[merge worker] variable {name} failed for {date}: {e}', flush=True)
+                        print(f"[merge worker] variable {name} failed for {date}: {e}", flush=True)
                         missing_weight[name] += _weights_space * inv_wsum
                         continue
             finally:
@@ -1355,23 +1429,36 @@ def _merge_worker_loop(tile_paths, states, name_var_save, ny, nx,
                 del _ds
 
         try:
-            result_q.put({'contrib': contrib, 'missing_weight': missing_weight})
+            result_q.put({"contrib": contrib, "missing_weight": missing_weight})
         except Exception:
             return
 
-def run_assimilation_time_window(config, date_start, date_middle, date_end, list_State, processes, 
-                                 weights_space=None, weights_space_sum=None, interpolators=None,
-                                 name_var_save=['sla'], 
-                                 flag_assim=True, flag_merge_outputs=True, flag_diag=True, flag_overwrite_outputs=True,
-                                 nprocs=4, nprocs_output=None,
-                                 path_pickle=None,
-                                 gpu_devices=None):
-    
+
+def run_assimilation_time_window(
+    config,
+    date_start,
+    date_middle,
+    date_end,
+    list_State,
+    processes,
+    weights_space=None,
+    weights_space_sum=None,
+    interpolators=None,
+    name_var_save=["sla"],
+    flag_assim=True,
+    flag_merge_outputs=True,
+    flag_diag=True,
+    flag_overwrite_outputs=True,
+    nprocs=4,
+    nprocs_output=None,
+    path_pickle=None,
+    gpu_devices=None,
+):
     """
     Run assimilation in a given time window using subprocesses.
     The subprocesses are run in parallel and the outputs are merged.
     Diagnostics are then computed on the merged outputs.
-    
+
     If weights_space, weights_space_sum, and interpolators are None,
     they are loaded from '{path_pickle}/weights.pkl'.
     """
@@ -1380,27 +1467,27 @@ def run_assimilation_time_window(config, date_start, date_middle, date_end, list
 
     # Load weights and interpolators from pickle if not provided
     if weights_space is None and path_pickle is not None:
-        with open(f'{path_pickle}/weights.pkl', 'rb') as f:
+        with open(f"{path_pickle}/weights.pkl", "rb") as f:
             data = pickle.load(f)
-        weights_space_sum = data['weights_space_sum']
-        list_tile_paths = data.get('list_tile_paths')
+        weights_space_sum = data["weights_space_sum"]
+        list_tile_paths = data.get("list_tile_paths")
         # Per-tile weights/interpolators are loaded on-the-fly by merge_output_date
 
     ############################
     # Run subprocesses
     ############################
     if flag_assim:
-        print('Run subprocesses')
+        print("Run subprocesses")
         try:
-            old_stdout = sys.stdout # backup current stdout
-            sys.stdout = open(os.devnull, "w") # prevent printoing outputs
-            _gpu_devices = gpu_devices if gpu_devices is not None else ['0']
+            old_stdout = sys.stdout  # backup current stdout
+            sys.stdout = open(os.devnull, "w")  # prevent printoing outputs
+            _gpu_devices = gpu_devices if gpu_devices is not None else ["0"]
             gpu_load = {g: 0 for g in _gpu_devices}
             active_processes = set()  # set of (process, gpu_id)
 
             for worker in processes[:nprocs]:  # Start initial nprocs processes
                 gpu_id = min(gpu_load, key=gpu_load.get)
-                p = mp.get_context("spawn").Process(target=worker, kwargs={'gpu_device': gpu_id})
+                p = mp.get_context("spawn").Process(target=worker, kwargs={"gpu_device": gpu_id})
                 p.start()
                 active_processes.add((p, gpu_id))
                 gpu_load[gpu_id] += 1
@@ -1415,7 +1502,7 @@ def run_assimilation_time_window(config, date_start, date_middle, date_end, list
                             break
 
                 gpu_id = min(gpu_load, key=gpu_load.get)
-                p = mp.get_context("spawn").Process(target=worker, kwargs={'gpu_device': gpu_id})
+                p = mp.get_context("spawn").Process(target=worker, kwargs={"gpu_device": gpu_id})
                 p.start()
                 active_processes.add((p, gpu_id))
                 gpu_load[gpu_id] += 1
@@ -1426,9 +1513,8 @@ def run_assimilation_time_window(config, date_start, date_middle, date_end, list
             sys.stdout = old_stdout
         except:
             sys.stdout = old_stdout
-            print('Unable to run subprocesses')
+            print("Unable to run subprocesses")
 
-    
     ############################
     # Create merged config
     ############################
@@ -1436,60 +1522,75 @@ def run_assimilation_time_window(config, date_start, date_middle, date_end, list
     config0.EXP = config0.EXP.copy()
     config0.EXP.init_date = date_start
     config0.EXP.final_date = date_end
-    config0.EXP.tmp_DA_path += f'/subwindow_{str(date_middle)[:10]}'
-    config0.EXP.path_save += f'/subwindow_{str(date_middle)[:10]}'
+    config0.EXP.tmp_DA_path += f"/subwindow_{str(date_middle)[:10]}"
+    config0.EXP.path_save += f"/subwindow_{str(date_middle)[:10]}"
     if flag_diag and config.DIAG is not None:
         config0.DIAG = config.DIAG.copy()
-        if 'super' not in config0.DIAG:
+        if "super" not in config0.DIAG:
             for NAME_DIAG in config0.DIAG:
                 config0.DIAG[NAME_DIAG] = config.DIAG[NAME_DIAG].copy()
-                config0.DIAG[NAME_DIAG].dir_output += f'/subwindow_{str(date_middle)[:10]}'
-                config0.DIAG[NAME_DIAG].time_min = date_start.strftime('%Y-%m-%d')
-                config0.DIAG[NAME_DIAG].time_max = date_end.strftime('%Y-%m-%d')
+                config0.DIAG[NAME_DIAG].dir_output += f"/subwindow_{str(date_middle)[:10]}"
+                config0.DIAG[NAME_DIAG].time_min = date_start.strftime("%Y-%m-%d")
+                config0.DIAG[NAME_DIAG].time_max = date_end.strftime("%Y-%m-%d")
         else:
-            config0.DIAG.dir_output += f'/subwindow_{str(date_middle)[:10]}'
-            config0.DIAG.time_min = date_start.strftime('%Y-%m-%d')
-            config0.DIAG.time_max = date_end.strftime('%Y-%m-%d')
-    
+            config0.DIAG.dir_output += f"/subwindow_{str(date_middle)[:10]}"
+            config0.DIAG.time_min = date_start.strftime("%Y-%m-%d")
+            config0.DIAG.time_max = date_end.strftime("%Y-%m-%d")
+
     State0 = state.State(config0, verbose=0)
-    
+
     ############################
     # Merge outputs
     ############################
-    if flag_merge_outputs and ((flag_overwrite_outputs) or (len(glob.glob(f'{config0.EXP.path_save}/*.nc'))==0) or (flag_assim and len(processes)>0)): 
+    if flag_merge_outputs and (
+        (flag_overwrite_outputs) or (len(glob.glob(f"{config0.EXP.path_save}/*.nc")) == 0) or (flag_assim and len(processes) > 0)
+    ):
         try:
-            print('Merge outputs')
-            kernel = Gaussian2DKernel(x_stddev=1, y_stddev=1)  # Kernel to convolve output maps to replace NaN pixels close to the coast for interpolation
+            print("Merge outputs")
+            kernel = Gaussian2DKernel(
+                x_stddev=1, y_stddev=1
+            )  # Kernel to convolve output maps to replace NaN pixels close to the coast for interpolation
             list_dates = generate_dates(date_start, date_end, config.EXP.saveoutput_time_step)
             num_workers = nprocs_output if nprocs_output is not None else nprocs
-            parallel_merge(list_dates, State0, list_State, name_var_save, kernel, weights_space, weights_space_sum, interpolators, list_tile_paths=list_tile_paths, num_workers=num_workers)
+            parallel_merge(
+                list_dates,
+                State0,
+                list_State,
+                name_var_save,
+                kernel,
+                weights_space,
+                weights_space_sum,
+                interpolators,
+                list_tile_paths=list_tile_paths,
+                num_workers=num_workers,
+            )
 
         except:
-            print('Unable to merge outputs')
-    
+            print("Unable to merge outputs")
+
     ############################
     # Diagnostics
     ############################
     if flag_diag:
         try:
-            print('Run Diagnostics')
-            Diag = diag.Diag(config0,State0)
+            print("Run Diagnostics")
+            Diag = diag.Diag(config0, State0)
             Diag.regrid_exp()
             Diag.rmse_based_scores(plot=True)
             Diag.psd_based_scores(plot=True)
             Diag.movie(framerate=12)
             Diag.Leaderboard()
         except:
-            print('Unable to compute diags')
-        
+            print("Unable to compute diags")
+
         del State0, config0
 
+
 def merge_time_windows_outputs(config, list_date_start, list_date_middle, list_date_end, time_overlap):
-    
     """
     Merge outputs from different time windows.
-    
-    In overlap regions between consecutive windows, a raised-cosine (Hann) blending 
+
+    In overlap regions between consecutive windows, a raised-cosine (Hann) blending
     is used for a smooth transition with zero-derivative at the boundaries,
     avoiding artifacts from a linear ramp.
 
@@ -1510,22 +1611,26 @@ def merge_time_windows_outputs(config, list_date_start, list_date_middle, list_d
     n_windows = len(list_date_start)
 
     def _build_path(subwindow_middle, date):
-        return (f'{config.EXP.path_save}/subwindow_{str(subwindow_middle)[:10]}/'
-                f'{config.EXP.name_experiment}'
-                f'_y{date.year}'
-                f'm{str(date.month).zfill(2)}'
-                f'd{str(date.day).zfill(2)}'
-                f'h{str(date.hour).zfill(2)}'
-                f'm{str(date.minute).zfill(2)}.nc')
-    
+        return (
+            f"{config.EXP.path_save}/subwindow_{str(subwindow_middle)[:10]}/"
+            f"{config.EXP.name_experiment}"
+            f"_y{date.year}"
+            f"m{str(date.month).zfill(2)}"
+            f"d{str(date.day).zfill(2)}"
+            f"h{str(date.hour).zfill(2)}"
+            f"m{str(date.minute).zfill(2)}.nc"
+        )
+
     def _build_output_path(date):
-        return (f'{config.EXP.path_save}/'
-                f'{config.EXP.name_experiment}'
-                f'_y{date.year}'
-                f'm{str(date.month).zfill(2)}'
-                f'd{str(date.day).zfill(2)}'
-                f'h{str(date.hour).zfill(2)}'
-                f'm{str(date.minute).zfill(2)}.nc')
+        return (
+            f"{config.EXP.path_save}/"
+            f"{config.EXP.name_experiment}"
+            f"_y{date.year}"
+            f"m{str(date.month).zfill(2)}"
+            f"d{str(date.day).zfill(2)}"
+            f"h{str(date.hour).zfill(2)}"
+            f"m{str(date.minute).zfill(2)}.nc"
+        )
 
     # Collect all unique dates across all windows
     all_dates = set()
@@ -1539,8 +1644,7 @@ def merge_time_windows_outputs(config, list_date_start, list_date_middle, list_d
     for date in all_dates:
         try:
             # Find which windows contain this date
-            active = [i for i in range(n_windows)
-                      if list_date_start[i] <= date <= list_date_end[i]]
+            active = [i for i in range(n_windows) if list_date_start[i] <= date <= list_date_end[i]]
 
             if len(active) == 1:
                 # No overlap: use the single window directly
@@ -1581,4 +1685,4 @@ def merge_time_windows_outputs(config, list_date_start, list_date_middle, list_d
             dsout.to_netcdf(_build_output_path(date))
             dsout.close()
         except Exception as e:
-            print(f'[merge_time_windows_outputs] WARNING: failed for {date}: {e}', flush=True)
+            print(f"[merge_time_windows_outputs] WARNING: failed for {date}: {e}", flush=True)
