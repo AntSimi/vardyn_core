@@ -2,7 +2,6 @@
 Global precision flag used to configure JAX float64 behavior.
 """
 
-import os
 import jax
 
 # Global flag: True for float64, False for float32

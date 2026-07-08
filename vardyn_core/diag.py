@@ -542,7 +542,7 @@ That could be due to non regular grid or bad written netcdf file")
             # Experiment
             try:
                 cs = plt.contour(
-                    1.0 / psd_based_score[f"freq_r"].values,
+                    1.0 / psd_based_score["freq_r"].values,
                     1.0 / psd_based_score[f"freq_{self.name_ref_time}"].values,
                     psd_based_score.sel(run="experiment"),
                     level,
@@ -557,7 +557,7 @@ That could be due to non regular grid or bad written netcdf file")
             # Baseline
             try:
                 cs = plt.contour(
-                    1.0 / psd_based_score[f"freq_r"].values,
+                    1.0 / psd_based_score["freq_r"].values,
                     1.0 / psd_based_score[f"freq_{self.name_ref_time}"].values,
                     psd_based_score.sel(run="baseline"),
                     level,
@@ -572,7 +572,7 @@ That could be due to non regular grid or bad written netcdf file")
         else:
             try:
                 cs = plt.contour(
-                    1.0 / psd_based_score[f"freq_r"].values,
+                    1.0 / psd_based_score["freq_r"].values,
                     1.0 / psd_based_score[f"freq_{self.name_ref_time}"].values,
                     psd_based_score,
                     level,

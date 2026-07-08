@@ -7,10 +7,6 @@ Spectral 2D Helmholtz equation solver on rectangular and non-rectangular domain.
 Louis Thiry, 2023.
 """
 
-import sys
-
-sys.path.insert(0, "../../src")  # add src to path to import modules
-from src.config import USE_FLOAT64
 import numpy as np
 import jax
 
@@ -282,9 +278,7 @@ class HelmholtzNeumannSolver:
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
     import matplotlib
-    import numpy as np
 
     matplotlib.rcParams.update({"font.size": 18})
     plt.ion()

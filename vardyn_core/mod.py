@@ -3078,15 +3078,15 @@ class Model_qgsw(M):
                 elif config.MOD.cmax is not None:
                     c_fill = config.MOD.cmax
                     print(
-                        f"WARNING: all Rossby phase velocity values are NaN "
-                        f"after interpolation (tile may lie outside the aux "
+                        "WARNING: all Rossby phase velocity values are NaN "
+                        "after interpolation (tile may lie outside the aux "
                         f"file domain). Falling back to cmax={c_fill} m/s."
                     )
                 else:
                     print(
-                        f"WARNING: all Rossby phase velocity values are NaN "
-                        f"after interpolation and no cmin/cmax fallback is "
-                        f"defined. H will be NaN and the model will likely fail."
+                        "WARNING: all Rossby phase velocity values are NaN "
+                        "after interpolation and no cmin/cmax fallback is "
+                        "defined. H will be NaN and the model will likely fail."
                     )
             self.c[np.isnan(self.c)] = c_fill
 
@@ -3142,7 +3142,7 @@ class Model_qgsw(M):
                     plt.show()
                 if config.MOD.name_class.lower() == "qg" or getattr(config.MOD, "constant_H", False):
                     H = H0  # QG needs constant H; constant_H flag forces uniform H for SW too
-                    print(f"H set to constant: H = {H0[0,0,0]:.4f} m")
+                    print(f"H set to constant: H = {H0[0, 0, 0]:.4f} m")
             else:
                 H = H0 = config.MOD.H
                 if not hasattr(H, "shape"):
@@ -3605,7 +3605,7 @@ class Model_qgsw(M):
                 H = self._as_H_model_array(arr, State, name)
                 if self._is_qg_class and not (H.shape == (1, 1, 1) or np.nanstd(H) == 0.0):
                     H = np.array([[[np.nanmean(H)]]])
-                    print(f"H read from {path_init}:{name} and averaged for QG: H = {H[0,0,0]:.4f} m")
+                    print(f"H read from {path_init}:{name} and averaged for QG: H = {H[0, 0, 0]:.4f} m")
                 else:
                     print(f"H read from {path_init}:{name}")
                 return H
@@ -5873,9 +5873,9 @@ class Model_bmit(_ITOpenBoundaryExtensionMixin, M):
             )
             _ntheta = int(np.ceil(_L_bdy / _lambda_min))
             print(
-                f"  Auto Ntheta (boundary tangential Nyquist): "
-                f"lambda_min={_lambda_min/1e3:.1f} km, "
-                f"L_bdy={_L_bdy/1e3:.1f} km -> Ntheta={_ntheta}"
+                "  Auto Ntheta (boundary tangential Nyquist): "
+                f"lambda_min={_lambda_min / 1e3:.1f} km, "
+                f"L_bdy={_L_bdy / 1e3:.1f} km -> Ntheta={_ntheta}"
             )
         if _ntheta > 0:
             theta_p = np.arange(0, pi / 2 + pi / 2 / _ntheta, pi / 2 / _ntheta)
@@ -7857,4 +7857,4 @@ def adjoint_test(M, State, t0=0, nstep=1, ampl=1):
     ps1 = np.inner(dX1[~mask], adX0[~mask])
     ps2 = np.inner(dX0[~mask], adX1[~mask])
 
-    print(f"  adjoint_test ({np_dtype.__name__}):  <Mdx,y> = {ps1} <dx,M*y> = {ps2} \n<Mdx,y>/<dx,M*y> = {ps1/ps2}")
+    print(f"  adjoint_test ({np_dtype.__name__}):  <Mdx,y> = {ps1} <dx,M*y> = {ps2} \n<Mdx,y>/<dx,M*y> = {ps1 / ps2}")

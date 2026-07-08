@@ -1,6 +1,5 @@
-import jax
 import jax.numpy as jnp
-from tools import avg_pool2d, pad_replicate
+from tools import avg_pool2d
 
 
 class Masks:

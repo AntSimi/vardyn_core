@@ -160,7 +160,7 @@ class State:
 
         km2deg = 1.0 / 111.32
 
-        if not None in [config.ny, config.nx]:
+        if None not in [config.ny, config.nx]:
 
             ENSLAT = np.linspace(config.lat_min, config.lat_max, config.ny)
 

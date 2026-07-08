@@ -22,7 +22,6 @@ from datetime import timedelta
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 import threading
-import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.cm as cm
@@ -31,8 +30,7 @@ from cartopy.feature import ShapelyFeature
 from shapely.geometry import Polygon
 import xarray as xr
 
-from . import exp, tools as grid, state, mod, inv, diag, obs as _obs
-from .tools import gaspari_cohn
+from . import exp, tools as grid, state, inv, diag, obs as _obs
 
 
 def prepare_process(
@@ -433,7 +431,7 @@ def prepare_process(
                 _State.lon_max = _State.lon.max()
                 _State.lon_unit = "0_360"
 
-            tile_geom_name = f"subwindow_{round((lon1+lon0)/2)}_{round((lat1+lat0)/2)}"
+            tile_geom_name = f"subwindow_{round((lon1 + lon0) / 2)}_{round((lat1 + lat0) / 2)}"
 
             if (lat0, lat1) != _prev_lat_band:
                 eq_tag = " [EQ]" if is_eq else ""

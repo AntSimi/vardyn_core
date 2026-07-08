@@ -3,7 +3,7 @@ Runs inversion drivers and assimilation orchestration.
 """
 
 from .config import USE_FLOAT64
-import sys, os
+import sys
 import time
 import numpy as np
 import os
@@ -17,8 +17,6 @@ import glob
 import jax
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
-
-from . import tools as grid
 
 
 class ConvergenceReached(Exception):

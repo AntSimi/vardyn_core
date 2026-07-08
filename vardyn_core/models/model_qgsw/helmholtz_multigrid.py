@@ -259,10 +259,10 @@ class MG_Helmholtz:
         nx, ny = self.nx, self.ny
         assert (
             coef_ugrid.shape[-2] == nx + 1 and coef_ugrid.shape[-1] == ny
-        ), f"Invalid coef shape {coef_ugrid.shape[-2:]} != ({nx+1}, {ny})"
+        ), f"Invalid coef shape {coef_ugrid.shape[-2:]} != ({nx + 1}, {ny})"
         assert (
             coef_vgrid.shape[-2] == nx and coef_vgrid.shape[-1] == ny + 1
-        ), f"Invalid coef shape {coef_vgrid.shape[-2:]} != ({nx}, {ny+1})"
+        ), f"Invalid coef shape {coef_vgrid.shape[-2:]} != ({nx}, {ny + 1})"
         # Cell-center average of u/v coefficients, shape (1, nx, ny)
         coef = 0.25 * jnp.expand_dims(coef_ugrid[..., 1:, :] + coef_ugrid[..., :-1, :] + coef_vgrid[..., 1:] + coef_vgrid[..., :-1], axis=0)
         self.coefs_ugrid = [jnp.expand_dims(coef_ugrid, 0) * self.masks_ugrid[0]]

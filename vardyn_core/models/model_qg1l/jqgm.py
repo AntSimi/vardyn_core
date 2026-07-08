@@ -2,7 +2,6 @@
 Implements the 1.5-layer quasi-geostrophic model and variants.
 """
 
-import sys
 import numpy as np
 from jax import jit
 from jax import jvp, vjp
@@ -844,8 +843,6 @@ class Qgm:
 
 
 if __name__ == "__main__":
-
-    import timeit
 
     ny, nx = 100, 100
     dx = 10e3 * jnp.ones((ny, nx))

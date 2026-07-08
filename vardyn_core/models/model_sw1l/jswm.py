@@ -9,8 +9,6 @@ import jax
 from jax import checkpoint as jax_checkpoint
 from jax.lax import scan
 
-import matplotlib.pylab as plt
-
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 
 
@@ -113,7 +111,7 @@ class CSWm:
                     warnings.warn(
                         f"CSWm: Ntheta={_ntheta_actual} is below the boundary Nyquist minimum "
                         f"Ntheta_min={_ntheta_min} "
-                        f"(lambda_min={_lambda_min/1e3:.1f} km, L_bdy={_L_bdy/1e3:.1f} km). "
+                        f"(lambda_min={_lambda_min / 1e3:.1f} km, L_bdy={_L_bdy / 1e3:.1f} km). "
                         f"Aliasing in along-boundary wave angle. "
                         f"Consider increasing Ntheta or setting Ntheta=-1 for auto.",
                         stacklevel=2,

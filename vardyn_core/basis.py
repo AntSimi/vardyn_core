@@ -325,7 +325,7 @@ class _Basis_gauss3d:
             f"Q={np.mean(Q):.1E}",
         )
 
-        print(f"reduced order: {time.size * self.nphys} --> {self.nbasis}\n reduced factor: {int(time.size * self.nphys/self.nbasis)}")
+        print(f"reduced order: {time.size * self.nphys} --> {self.nbasis}\n reduced factor: {int(time.size * self.nphys / self.nbasis)}")
 
         # Compute basis components
         Gauss_xy = self._compute_component_space()
@@ -1524,7 +1524,7 @@ class _Basis_bmaux:
             iwave += _nwavef
 
             print(
-                f"lambda={1/ff_eff[ieff]:.1E}",
+                f"lambda={1 / ff_eff[ieff]:.1E}",
                 f"nlocs={NP_eff[ieff]:.1E}",
                 f"tdec={np.mean(tdec[ieff]):.1E}",
                 f"Q={np.mean(Q[self.iff_wavebounds[ieff]:iwave]):.1E}",
@@ -1561,7 +1561,7 @@ class _Basis_bmaux:
         print("Computing Time components")
         self.Gt, self.Nt = self._compute_component_time(time)  # in time
 
-        print(f"reduced order: {time.size * self.nphys} --> {self.nbasis}\n reduced factor: {int(time.size * self.nphys/self.nbasis)}")
+        print(f"reduced order: {time.size * self.nphys} --> {self.nbasis}\n reduced factor: {int(time.size * self.nphys / self.nbasis)}")
 
         if return_q:
             return Xb, Q
@@ -2194,7 +2194,7 @@ class Basis_hbc:
             interval += self.n_params[name]
             interval_phys += self.n_params_phys[name]
         # PRINTING REDUCED ORDER : #
-        print(f"reduced order: {self.nphystot} --> {self.nbasis}\nreduced factor: {int(self.nphystot/self.nbasis)}")
+        print(f"reduced order: {self.nphystot} --> {self.nbasis}\nreduced factor: {int(self.nphystot / self.nbasis)}")
 
         #########################################
         ### COMPUTING THE COVARIANCE MATRIX Q ###

@@ -11,7 +11,6 @@ import numpy as np
 import jax.numpy as jnp
 import jax
 from jax import lax
-from jax import checkpoint  # same as jax.remat
 from jax import jit
 
 from finite_diff import interp_TP, interp_TP_inv, comp_ke, div_nofluxbc
@@ -22,9 +21,6 @@ from reconstruction import linear2_centered, linear4_left, linear6_left, smooth_
 from tools import avg_pool2d
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
-
-
-from functools import partial
 
 
 def smooth_clamp(x, x_min, sharpness=10.0):
@@ -180,8 +176,8 @@ class SW:
             assert shape == (nx, ny), f"Invalid mask shape {shape=}!=({nx},{ny})"
             vals = jnp.unique(mask).tolist()
             assert all([v in [0, 1] for v in vals]), f"Mask must be binary (0=land, 1=ocean), got unique values: {vals}"
-            assert vals != [0], f"Mask is all zeros (all-land tile): no ocean points to integrate over"
-            print(f'  - {"non-" if len(vals)==2 else ""}trivial mask provided')
+            assert vals != [0], "Mask is all zeros (all-land tile): no ocean points to integrate over"
+            print(f'  - {"non-" if len(vals) == 2 else ""}trivial mask provided')
 
         else:
             print("  - no mask provided, domain assumed to be rectangular")
@@ -475,8 +471,8 @@ class SW:
 
     def set_wind_forcing(self, taux, tauy):
         nx, ny = self.nx, self.ny
-        assert type(taux) == float or taux.shape == (nx - 1, ny), f"taux must be a float or a {(nx-1, ny)} Tensor"
-        assert type(tauy) == float or tauy.shape == (nx, ny - 1), f"tauy must be a float or a {(nx, ny-1)} Tensor"
+        assert type(taux) == float or taux.shape == (nx - 1, ny), f"taux must be a float or a {(nx - 1, ny)} Tensor"
+        assert type(tauy) == float or tauy.shape == (nx, ny - 1), f"tauy must be a float or a {(nx, ny - 1)} Tensor"
         self.taux = taux
         self.tauy = tauy
 
@@ -521,8 +517,8 @@ class SW:
                 f"hl_mean: {hl_mean}, "
                 f"h min: {h.min():.5E}, "
                 f"max: {h.max():.5E}, "
-                f"eta_sur min: {eta[:,0].min():+.5f}, "
-                f"max: {eta[:,0].max():.5f}"
+                f"eta_sur min: {eta[:, 0].min():+.5f}, "
+                f"max: {eta[:, 0].max():.5f}"
             )
 
     def advection_tracer(self, U, V, c_area):
