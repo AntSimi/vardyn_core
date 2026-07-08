@@ -1,6 +1,4 @@
 """
-Created by Florian Le Guillou on June 2026.
-
 Computes diagnostics and plotting products for experiments.
 """
 

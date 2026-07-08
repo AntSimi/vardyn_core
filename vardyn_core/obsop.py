@@ -1,7 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created by Florian Le Guillou on June 2026.
 
 Builds observation operators and interpolation mappings.
 """
@@ -18,8 +15,6 @@ from src import tools as grid
 import pickle
 import matplotlib.pylab as plt
 from scipy.interpolate import griddata
-from scipy.sparse import csc_matrix
-from scipy.spatial.distance import cdist
 from scipy.spatial import KDTree
 import pyinterp
 import jax.numpy as jnp 

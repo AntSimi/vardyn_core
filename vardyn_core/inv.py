@@ -1,30 +1,19 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created by Florian Le Guillou on June 2026.
-
 Runs inversion drivers and assimilation orchestration.
 """
 from .config import USE_FLOAT64
 import sys, os
 import time
 import numpy as np
-import pandas as pd
 import os
-import matplotlib.pylab as plt
-from datetime import datetime, timedelta
+from datetime import timedelta
 import scipy.optimize as opt
 import gc
 import xarray as xr
 
 import glob
-from importlib.machinery import SourceFileLoader
 
 import jax
-import jax.numpy as jnp
-import jax.lax as lax
-from jax import jit
-from jax.lax import scan
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 
 from . import tools as grid

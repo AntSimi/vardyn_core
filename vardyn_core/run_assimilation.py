@@ -1,6 +1,4 @@
 """
-Created by Florian Le Guillou on June 2026.
-
 Coordinates windowed assimilation runs and process orchestration.
 """
 
@@ -19,7 +17,6 @@ from scipy.interpolate import LinearNDInterpolator, RegularGridInterpolator
 from scipy.ndimage import distance_transform_edt
 import matplotlib.pyplot as plt
 from astropy.convolution import Gaussian2DKernel
-from astropy.convolution import Gaussian2DKernel, interpolate_replace_nans
 from datetime import timedelta
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor

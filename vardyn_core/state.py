@@ -1,8 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created by Florian Le Guillou on June 2026.
-
 Defines the model state container and grid-dependent fields.
 """
 
