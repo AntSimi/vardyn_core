@@ -1,0 +1,40 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+.profiles
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.coverage
+coverage.xml
+
+# Editor
+.idea
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Doc
+doc/source/gen_modules
+doc/source/auto_examples
+doc/source/_build/
+doc/source/_autosummary/
+doc/source/sg_execution_times.rst
