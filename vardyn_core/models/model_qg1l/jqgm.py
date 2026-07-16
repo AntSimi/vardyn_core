@@ -2,6 +2,7 @@
 Implements the 1.5-layer quasi-geostrophic model and variants.
 """
 
+from ...config import USE_FLOAT64
 import numpy as np
 from jax import jit
 from jax import jvp, vjp
@@ -108,6 +109,7 @@ def cg(q_flat, h2pv_operator, tol=1e-5, maxiter=1000):
 
 
 class Qgm:
+    NAME = "MOD_QG1L"
 
     ###########################################################################
     #                             Initialization                              #

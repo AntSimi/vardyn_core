@@ -31,8 +31,8 @@ class Config(dict):
 
 def _merge_configs(config_exp, config_def, NAME):
 
-    dict_exp = getattr(config_exp, NAME)
-    dict_def = getattr(config_def, dict_exp["super"])
+    dict_exp = config_exp.get(NAME)
+    dict_def = config_def.get(dict_exp["super"])
 
     _config = {}
     _config["super"] = dict_exp["super"]
@@ -53,26 +53,19 @@ def _merge_configs(config_exp, config_def, NAME):
 
 
 def merge_configs(config_exp, config_def, name):
-
-    try:
-        NAME = getattr(config_exp, name)
-
-        if type(NAME) == list:
-            config = {}
-            for _NAME in NAME:
-                config[_NAME] = _merge_configs(config_exp, config_def, _NAME)
-            config = Config(config)
-        else:
-            config = _merge_configs(config_exp, config_def, NAME)
-
-        return config
-
-    except:
-        print(f"{name} is not set in the configuration file")
-        return None
+    NAME = config_exp.get(name)
+    if type(NAME) == list:
+        config = {}
+        for _NAME in NAME:
+            config[_NAME] = _merge_configs(config_exp, config_def, _NAME)
+        config = Config(config)
+    else:
+        config = _merge_configs(config_exp, config_def, NAME)
+    return config
 
 
-def Exp(path_config):
+
+def Exp(config_exp):
     """
     NAME
         exp
@@ -84,52 +77,28 @@ def Exp(path_config):
         Returns:
             configuration module
     """
-
-    _dir, _config = os.path.split(path_config)
-    sys.path.insert(0, _dir)
-    if _config[-3:] == ".py":
-        _config = _config[:-3]
-    else:
-        path_config += ".py"
-    config_exp = __import__(_config)
-
     # Merge with default config file
-    from . import config_default as config_def
+    from .config_default import default  as config_def
 
     config = Config({})
-    config.name_file = path_config
 
     # EXP
     config.EXP = {}
-    for key, val in config_exp.EXP.items():
+    for key, val in config_exp['EXP'].items():
         config.EXP[key] = val
-    for key, val in config_def.EXP.items():
+    for key, val in config_def['EXP'].items():
         if key not in config.EXP:
             config.EXP[key] = val
     config.EXP = Config(config.EXP)
-    print(config.EXP)
-
     config.GRID = merge_configs(config_exp, config_def, "NAME_GRID")
     config.OBS = merge_configs(config_exp, config_def, "NAME_OBS")
     config.MOD = merge_configs(config_exp, config_def, "NAME_MOD")
     config.OBSOP = merge_configs(config_exp, config_def, "NAME_OBSOP")
     config.BASIS = merge_configs(config_exp, config_def, "NAME_BASIS")
     config.INV = merge_configs(config_exp, config_def, "NAME_INV")
-    config.DIAG = merge_configs(config_exp, config_def, "NAME_DIAG")
+    if "NAME_DIAG" in config_exp:
+        config.DIAG = merge_configs(config_exp, config_def, "NAME_DIAG")
 
     del config_exp
-    sys.modules.pop(_config)
-
-    # temporary directory
-    if not os.path.exists(config.EXP.tmp_DA_path):
-        os.makedirs(config.EXP.tmp_DA_path)
-    cmd = f"cp {path_config} {config.EXP.tmp_DA_path}/config.py"
-    os.system(cmd)
-
-    # outptut directory
-    if not os.path.exists(config.EXP.path_save):
-        os.makedirs(config.EXP.path_save)
-    cmd = f"cp {path_config} {config.EXP.path_save}/config.py"
-    os.system(cmd)
 
     return config

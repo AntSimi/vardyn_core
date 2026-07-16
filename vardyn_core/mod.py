@@ -3,7 +3,8 @@ Implements the model factory and dynamical model classes.
 """
 
 from .config import USE_FLOAT64
-from importlib.machinery import SourceFileLoader
+# from importlib.machinery import SourceFileLoader
+from .models import REGISTERED_SUBMODEL
 import sys
 import xarray as xr
 import numpy as np
@@ -98,6 +99,7 @@ class _BcFields:
         dlat = np.nanmean(self.lat[1:, :] - self.lat[:-1, :])
 
         _ds = xr.open_mfdataset(config_bc.file)
+        # FIXME Un load suffit ??
         ds = _ds.copy()
         _ds.close()
 
@@ -417,29 +419,8 @@ def Model(config, State, verbose=True):
     """
     if config.MOD is None:
         return
-
-    elif config.MOD.super is None:
-        return Model_multi(config, State)
-
-    elif config.MOD.super is not None:
-        if verbose:
-            print(config.MOD)
-        if config.MOD.super == "MOD_DIFF":
-            return Model_diffusion(config, State)
-        elif config.MOD.super == "MOD_QG1L":
-            return Model_qg1l(config, State)
-        elif config.MOD.super == "MOD_CSW1L":
-            return Model_csw1l(config, State)
-        elif config.MOD.super == "MOD_QGSW":
-            return Model_qgsw(config, State)
-        elif config.MOD.super == "MOD_BMIT":
-            return Model_bmit(config, State)
-        else:
-            sys.exit(config.MOD.super + " not implemented yet")
-    else:
-        sys.exit("super class if not defined")
-
-
+    return REGISTERED_MODEL.get(config.MOD.super)(config, State)
+    
 ###############################################################################
 #                            Mother Model                                     #
 ###############################################################################
@@ -748,6 +729,7 @@ class M:
 
 
 class Model_diffusion(M):
+    NAME = 'MOD_DIFF'
 
     def __init__(self, config, State):
 
@@ -941,19 +923,15 @@ class Model_diffusion(M):
 
 class Model_qg1l(M):
 
+    NAME = 'MOD_QG1L'
+
     def __init__(self, config, State):
 
         super().__init__(config, State)
 
         os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-
-        # Model specific libraries
-        if config.MOD.dir_model is None:
-            dir_model = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "models", "model_qg1l"))
-        else:
-            dir_model = config.MOD.dir_model
-        qgm = SourceFileLoader("qgm", f"{dir_model}/jqgm.py").load_module()
-        model = getattr(qgm, config.MOD.name_class)
+        
+        model = REGISTERED_SUBMODEL.get(self.NAME)
 
         # Coriolis
         if config.MOD.f0 is not None and config.MOD.constant_f:
@@ -1591,7 +1569,7 @@ class Model_qg1l(M):
 
 
 class Model_csw1l(_ITOpenBoundaryExtensionMixin, M):
-
+    NAME= 'MOD_CSW1L'
     def __init__(self, config, State):
 
         super().__init__(config, State)
@@ -2869,7 +2847,7 @@ class Model_csw1l(_ITOpenBoundaryExtensionMixin, M):
 
 
 class Model_qgsw(M):
-
+    NAME="MOD_QGSW"
     def __init__(self, config, State):
 
         super().__init__(config, State)
@@ -5518,7 +5496,7 @@ class Model_qgsw(M):
 
 
 class Model_bmit(_ITOpenBoundaryExtensionMixin, M):
-
+    NAME="MOD_BMIT"
     def _load_component_bc_fields(self, component_config, config, State):
         bc_sources = []
         if getattr(component_config, "bc_file", None) is not None:
@@ -7566,6 +7544,7 @@ class Model_bmit(_ITOpenBoundaryExtensionMixin, M):
 
 
 class Model_multi:
+    NAME=None
 
     def __init__(self, config, State):
 
@@ -7858,3 +7837,8 @@ def adjoint_test(M, State, t0=0, nstep=1, ampl=1):
     ps2 = np.inner(dX0[~mask], adX1[~mask])
 
     print(f"  adjoint_test ({np_dtype.__name__}):  <Mdx,y> = {ps1} <dx,M*y> = {ps2} \n<Mdx,y>/<dx,M*y> = {ps1 / ps2}")
+
+
+REGISTERED_MODEL = dict()
+for cls in [Model_diffusion, Model_qg1l, Model_csw1l, Model_qgsw, Model_bmit, Model_multi]:
+    REGISTERED_MODEL[cls.NAME] = cls

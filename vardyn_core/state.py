@@ -30,15 +30,15 @@ class State:
         self.config = config
 
         # Parameters
-        self.name_time = config.EXP.name_time
-        self.name_lon = config.EXP.name_lon
-        self.name_lat = config.EXP.name_lat
-        self.name_exp_save = config.EXP.name_exp_save
-        self.path_save = config.EXP.path_save
-        self.tmp_DA_path = config.EXP.tmp_DA_path
+        self.name_time = config['EXP'].name_time
+        self.name_lon = config['EXP'].name_lon
+        self.name_lat = config['EXP'].name_lat
+        self.name_exp_save = config['EXP'].name_exp_save
+        self.path_save = config['EXP'].path_save
+        self.tmp_DA_path = config['EXP'].tmp_DA_path
         if first and not os.path.exists(self.path_save):
             os.makedirs(self.path_save)
-        self.flag_plot = config.EXP.flag_plot
+        self.flag_plot = config['EXP'].flag_plot
 
         #  Initialize state variables dictonary
         self.var = {}
@@ -684,21 +684,21 @@ class State:
                 _min = np.nanmin(self.var[name_var])
                 _max = np.nanmax(self.var[name_var])
                 _max_abs = np.nanmax(np.absolute(self.var[name_var]))
+                kw = dict()
                 if np.sign(_min) != np.sign(_max) and ((_max - np.abs(_min)) < 0.5 * _max_abs):
-                    im = ax.pcolormesh(self.var[name_var], cmap=cmap, shading="auto", vmin=-_max_abs, vmax=_max_abs)
-                else:
-                    im = ax.pcolormesh(self.var[name_var], shading="auto")
+                    kw = dict(cmap=cmap, vmin=-_max_abs, vmax=_max_abs)
+                im = ax.pcolormesh(self.var[name_var], shading="auto", **kw)
                 plt.colorbar(im, ax=ax)
         else:
             for ax, name_var in zip(axs, plot_keys):
                 ax.set_title(name_var)
 
                 try:
+                    kw = dict()
                     if np.sign(np.nanmin(self.params[name_var])) != np.sign(np.nanmax(self.params[name_var])):
                         cmap_range = np.nanmax(np.absolute(self.params[name_var]))
-                        im = ax.pcolormesh(self.params[name_var], cmap=cmap, shading="auto", vmin=-cmap_range, vmax=cmap_range)
-                    else:
-                        im = ax.pcolormesh(self.params[name_var], shading="auto")
+                        kw = dict(cmap=cmap, vmin=-cmap_range, vmax=cmap_range)
+                    im = ax.pcolormesh(self.params[name_var], shading="auto", **kw)
                     plt.colorbar(im, ax=ax)
 
                 except:

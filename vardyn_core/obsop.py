@@ -13,7 +13,7 @@ import os, sys
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 import xarray as xr
 import numpy as np
-from src import tools as grid
+from . import tools as grid
 import pickle
 import matplotlib.pylab as plt
 from scipy.interpolate import griddata
