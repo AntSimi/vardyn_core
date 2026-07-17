@@ -3,10 +3,10 @@ Provides shared numerical, interpolation, and filtering utilities.
 """
 
 import numpy as np
-import xarray as xr
-import scipy.linalg as spl
-from scipy import interpolate, spatial
 import scipy
+from scipy import interpolate, spatial
+import scipy.linalg as spl
+import xarray as xr
 
 
 def gaspari_cohn(r, c=1):

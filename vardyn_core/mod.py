@@ -2,21 +2,24 @@
 Implements the model factory and dynamical model classes.
 """
 
-from .config import USE_FLOAT64
-# from importlib.machinery import SourceFileLoader
-from .models import REGISTERED_SUBMODEL
-import sys
-import xarray as xr
-import numpy as np
-import os
-from math import pi
 from datetime import timedelta
+from math import pi
+import os
+import sys
+
+import jax
+from jax import jit
+import jax.numpy as jnp
 import matplotlib.pylab as plt
+import numpy as np
 import pyinterp
 import pyinterp.fill
-import jax
-import jax.numpy as jnp
-from jax import jit
+import xarray as xr
+
+from .config import USE_FLOAT64
+
+# from importlib.machinery import SourceFileLoader
+from .models import REGISTERED_SUBMODEL
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 
@@ -420,7 +423,8 @@ def Model(config, State, verbose=True):
     if config.MOD is None:
         return
     return REGISTERED_MODEL.get(config.MOD.super)(config, State)
-    
+
+
 ###############################################################################
 #                            Mother Model                                     #
 ###############################################################################
@@ -729,7 +733,7 @@ class M:
 
 
 class Model_diffusion(M):
-    NAME = 'MOD_DIFF'
+    NAME = "MOD_DIFF"
 
     def __init__(self, config, State):
 
@@ -923,14 +927,14 @@ class Model_diffusion(M):
 
 class Model_qg1l(M):
 
-    NAME = 'MOD_QG1L'
+    NAME = "MOD_QG1L"
 
     def __init__(self, config, State):
 
         super().__init__(config, State)
 
         os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-        
+
         model = REGISTERED_SUBMODEL.get(self.NAME)
 
         # Coriolis
@@ -1569,7 +1573,8 @@ class Model_qg1l(M):
 
 
 class Model_csw1l(_ITOpenBoundaryExtensionMixin, M):
-    NAME= 'MOD_CSW1L'
+    NAME = "MOD_CSW1L"
+
     def __init__(self, config, State):
 
         super().__init__(config, State)
@@ -2847,7 +2852,8 @@ class Model_csw1l(_ITOpenBoundaryExtensionMixin, M):
 
 
 class Model_qgsw(M):
-    NAME="MOD_QGSW"
+    NAME = "MOD_QGSW"
+
     def __init__(self, config, State):
 
         super().__init__(config, State)
@@ -5496,7 +5502,8 @@ class Model_qgsw(M):
 
 
 class Model_bmit(_ITOpenBoundaryExtensionMixin, M):
-    NAME="MOD_BMIT"
+    NAME = "MOD_BMIT"
+
     def _load_component_bc_fields(self, component_config, config, State):
         bc_sources = []
         if getattr(component_config, "bc_file", None) is not None:
@@ -7544,7 +7551,7 @@ class Model_bmit(_ITOpenBoundaryExtensionMixin, M):
 
 
 class Model_multi:
-    NAME=None
+    NAME = None
 
     def __init__(self, config, State):
 

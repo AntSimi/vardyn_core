@@ -2,14 +2,11 @@
 Implements the projected shallow-water formulation of the QG model.
 """
 
-import numpy as np
-
-
-from helmholtz import compute_laplace_dstI, solve_helmholtz_dstI, solve_helmholtz_dstI_cmm, compute_capacitance_matrices
 from finite_diff import grad_perp
-from tools import avg_pool2d
-
+from helmholtz import compute_capacitance_matrices, compute_laplace_dstI, solve_helmholtz_dstI, solve_helmholtz_dstI_cmm
 from jax import numpy as jnp
+import numpy as np
+from tools import avg_pool2d
 
 
 class QG(SW):

@@ -2,8 +2,9 @@
 Loads and merges experiment configuration files.
 """
 
-import os, sys
 from copy import deepcopy
+import os
+import sys
 
 
 class Config(dict):
@@ -64,7 +65,6 @@ def merge_configs(config_exp, config_def, name):
     return config
 
 
-
 def Exp(config_exp):
     """
     NAME
@@ -78,15 +78,15 @@ def Exp(config_exp):
             configuration module
     """
     # Merge with default config file
-    from .config_default import default  as config_def
+    from .config_default import default as config_def
 
     config = Config({})
 
     # EXP
     config.EXP = {}
-    for key, val in config_exp['EXP'].items():
+    for key, val in config_exp["EXP"].items():
         config.EXP[key] = val
-    for key, val in config_def['EXP'].items():
+    for key, val in config_def["EXP"].items():
         if key not in config.EXP:
             config.EXP[key] = val
     config.EXP = Config(config.EXP)

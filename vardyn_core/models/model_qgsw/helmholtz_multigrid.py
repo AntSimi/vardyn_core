@@ -20,9 +20,9 @@ Domain defined by a mask embedded in a rectangle.
 Louis Thiry, 2023 (PyTorch) — converted to JAX 2024
 """
 
-import numpy as np
 import jax
 import jax.numpy as jnp
+import numpy as np
 from tools import avg_pool2d
 
 

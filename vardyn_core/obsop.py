@@ -3,25 +3,29 @@
 Builds observation operators and interpolation mappings.
 """
 
+import os
+import sys
+
 from .config import USE_FLOAT64
-import os, sys
 
 # Disable HDF5 file locking BEFORE importing xarray/netCDF4 — spawn worker
 # subprocesses re-import this module and would otherwise hit
 # "NetCDF: Not a valid ID" on shared filesystems when several tiles read
 # the same obs files concurrently.
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
-import xarray as xr
-import numpy as np
-from . import tools as grid
 import pickle
+
+import jax
+from jax import jit
+import jax.numpy as jnp
 import matplotlib.pylab as plt
+import numpy as np
+import pyinterp
 from scipy.interpolate import griddata
 from scipy.spatial import KDTree
-import pyinterp
-import jax.numpy as jnp
-from jax import jit
-import jax
+import xarray as xr
+
+from . import tools as grid
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 

@@ -3,11 +3,13 @@ Configuration file for running VarDyn-QG on the Agulhas region for the WHIRLS pr
 This configuration file is used to set up the parameters for the experiment, including paths, model settings, observational operators, reduced basis parameters, analysis parameters, observation parameters, and diagnostics.
 This configuration file is only a template and should be modified according to the specific needs of the experiment. In particular, the paths to the data and output directories should be updated to reflect the user's environment
 """
+
 from datetime import datetime, timedelta
-from vardyn_core import exp, state, mod, obs, obsop, basis, inv
-import matplotlib.pyplot as plt
 import os
 
+import matplotlib.pyplot as plt
+
+from vardyn_core import basis, exp, inv, mod, obs, obsop, state
 
 name_experiment = "VarDyn-QG"  # Short experiment name reused in output paths and files.
 
@@ -66,8 +68,10 @@ CONFIG = dict(
         super="GRID_GEO",  # Inherit defaults for a regular longitude/latitude grid.
         # lon_min=0, lon_max=50.0,
         # lat_min=-45.0, lat_max=-20.0,
-        lon_min=10, lon_max=20.0,
-        lat_min=-45.0, lat_max=-36,
+        lon_min=10,
+        lon_max=20.0,
+        lat_min=-45.0,
+        lat_max=-36,
         dlon=0.1,  # Longitude grid spacing, in degrees.
         dlat=0.1,  # Latitude grid spacing, in degrees.
         name_init_mask=path_mdt,  # Here the mask is set using the MDT file. The mask is set to 1 where the MDT is NaN (i.e. Land) and 0 where it is not NaN (i.e. Ocean).
@@ -254,7 +258,7 @@ CONFIG = dict(
     ),
 )
 
-os.makedirs(CONFIG['EXP']['tmp_DA_path'], exist_ok=True)
+os.makedirs(CONFIG["EXP"]["tmp_DA_path"], exist_ok=True)
 
 config = exp.Exp(CONFIG)
 State = state.State(config)
@@ -262,4 +266,4 @@ State = state.State(config)
 # dict_obs = obs.Obs(config,State)
 # Obsop = obsop.Obsop(config,State,dict_obs,Model)
 # Basis = basis.Basis(config,State)
-inv.Inv(config,State)  
+inv.Inv(config, State)

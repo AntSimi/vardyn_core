@@ -7,8 +7,8 @@ Spectral 2D Helmholtz equation solver on rectangular and non-rectangular domain.
 Louis Thiry, 2023.
 """
 
-import numpy as np
 import jax
+import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 from jax import numpy as jnp

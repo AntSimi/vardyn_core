@@ -2,14 +2,16 @@
 Defines the model state container and grid-dependent fields.
 """
 
-import numpy as np
-import xarray as xr
-import sys, os
-import pandas as pd
 from copy import deepcopy
-import matplotlib.pyplot as plt
 import glob
+import os
+import sys
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import pyinterp
+import xarray as xr
 
 from . import tools as grid
 
@@ -30,15 +32,15 @@ class State:
         self.config = config
 
         # Parameters
-        self.name_time = config['EXP'].name_time
-        self.name_lon = config['EXP'].name_lon
-        self.name_lat = config['EXP'].name_lat
-        self.name_exp_save = config['EXP'].name_exp_save
-        self.path_save = config['EXP'].path_save
-        self.tmp_DA_path = config['EXP'].tmp_DA_path
+        self.name_time = config["EXP"].name_time
+        self.name_lon = config["EXP"].name_lon
+        self.name_lat = config["EXP"].name_lat
+        self.name_exp_save = config["EXP"].name_exp_save
+        self.path_save = config["EXP"].path_save
+        self.tmp_DA_path = config["EXP"].tmp_DA_path
         if first and not os.path.exists(self.path_save):
             os.makedirs(self.path_save)
-        self.flag_plot = config['EXP'].flag_plot
+        self.flag_plot = config["EXP"].flag_plot
 
         #  Initialize state variables dictonary
         self.var = {}

@@ -2,28 +2,31 @@
 Computes diagnostics and plotting products for experiments.
 """
 
-import os, sys
-import glob
-import numpy as np
-import xarray as xr
-import netCDF4 as nc
-import pyinterp
-from scipy.interpolate import griddata
-import logging
-import scipy
-import xrft
-import netCDF4
-import matplotlib.pylab as plt
-import matplotlib.gridspec as gridspec
-from IPython.display import Video
-from matplotlib.ticker import ScalarFormatter
-from joblib import Parallel, delayed
 import gc
-import pandas as pd
+import glob
+import logging
+import os
 import subprocess
-from .tools import read_auxdata
-from . import tools as switchvar
+import sys
+
+from IPython.display import Video
 import cmocean
+from joblib import Parallel, delayed
+import matplotlib.gridspec as gridspec
+import matplotlib.pylab as plt
+from matplotlib.ticker import ScalarFormatter
+import netCDF4
+import netCDF4 as nc
+import numpy as np
+import pandas as pd
+import pyinterp
+import scipy
+from scipy.interpolate import griddata
+import xarray as xr
+import xrft
+
+from . import tools as switchvar
+from .tools import read_auxdata
 
 
 def Diag(config, State, verbose=1):

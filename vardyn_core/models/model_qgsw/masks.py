@@ -165,8 +165,8 @@ class Masks:
 
 
 if __name__ == "__main__":
-    import numpy as np
     import matplotlib
+    import numpy as np
 
     matplotlib.rcParams.update({"font.size": 24})
     import matplotlib.pyplot as plt

@@ -2,16 +2,16 @@
 Implements the 1.5-layer quasi-geostrophic model and variants.
 """
 
-from ...config import USE_FLOAT64
-import numpy as np
-from jax import jit
-from jax import jvp, vjp
-from jax.lax import scan
-from jax.scipy.sparse.linalg import cg as jcg
 from functools import partial
 
 import jax
+from jax import jit, jvp, vjp
+from jax.lax import scan
 import jax.numpy as jnp
+from jax.scipy.sparse.linalg import cg as jcg
+import numpy as np
+
+from ...config import USE_FLOAT64
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 

@@ -8,29 +8,30 @@ import os
 # filesystems (NFS/Lustre) concurrent reads from sibling subprocesses can
 # raise "NetCDF: Not a valid ID" otherwise.
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
-import sys
-import glob
+from concurrent.futures import ThreadPoolExecutor
 import copy as _copy
-import pickle
-import numpy as np
-import multiprocessing as mp
-from scipy.interpolate import LinearNDInterpolator, RegularGridInterpolator
-from scipy.ndimage import distance_transform_edt
-import matplotlib.pyplot as plt
-from astropy.convolution import Gaussian2DKernel
 from datetime import timedelta
 from functools import partial
-from concurrent.futures import ThreadPoolExecutor
+import glob
+import multiprocessing as mp
+import pickle
+import sys
 import threading
+
+from astropy.convolution import Gaussian2DKernel
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from cartopy.feature import ShapelyFeature
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
-from cartopy.feature import ShapelyFeature
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.interpolate import LinearNDInterpolator, RegularGridInterpolator
+from scipy.ndimage import distance_transform_edt
 from shapely.geometry import Polygon
 import xarray as xr
 
-from . import exp, tools as grid, state, inv, diag, obs as _obs
+from . import diag, exp, inv, obs as _obs, state, tools as grid
 
 
 def prepare_process(

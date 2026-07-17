@@ -1,6 +1,7 @@
 """
 Default experiment, grid, model, and diagnostics configuration blocks.
 """
+
 #################################################################################################################################
 # Global libraries
 #################################################################################################################################
@@ -11,7 +12,7 @@ default = dict(
     #################################################################################################################################
     # EXPERIMENTAL PARAMETERS
     #################################################################################################################################
-    EXP = dict(
+    EXP=dict(
         name_experiment="my_exp",  # name of the experiment
         saveoutputs=True,  # save outputs flag (True or False)
         name_exp_save="my_output_name",  # name of output files
@@ -36,15 +37,12 @@ default = dict(
         compute_obs=False,  # force computing observations
         path_obs=None,  # if set to None, observations are saved in *tmp_DA_path*
     ),
-
-
     #################################################################################################################################
     # GRID
     #################################################################################################################################
-    NAME_GRID = "GRID_GEO",
-
+    NAME_GRID="GRID_GEO",
     # Read grid from file
-    GRID_FROM_FILE = dict(
+    GRID_FROM_FILE=dict(
         path_init_grid="",
         name_init_lon="lon",
         name_init_lat="lat",
@@ -52,9 +50,8 @@ default = dict(
         name_init_mask=None,
         name_var_mask={"lon": "", "lat": "", "var": ""},
     ),
-
     # Regular geodetic grid
-    GRID_GEO = dict(
+    GRID_GEO=dict(
         lon_min=294.0,  # domain min longitude
         lon_max=306.0,  # domain max longitude
         lat_min=32.0,  # domain min latitude
@@ -64,9 +61,8 @@ default = dict(
         name_init_mask=None,
         name_var_mask={"lon": "", "lat": "", "var": ""},
     ),
-
     # Regular cartesian grid
-    GRID_CAR = dict(
+    GRID_CAR=dict(
         super="GRID_CAR",
         lon_min=295.0,  # domain min longitude
         lon_max=305.0,  # domain max longitude
@@ -78,19 +74,16 @@ default = dict(
         name_init_mask=None,
         name_var_mask={"lon": "", "lat": "", "var": ""},
     ),
-
     # Restart from previous run
-    GRID_RESTART = dict(
+    GRID_RESTART=dict(
         name_grid="restart",
     ),
-
     #################################################################################################################################
     # MODELS
     #################################################################################################################################
-    NAME_MOD = None,  # Either DIFF, QG1L, QG1LM, SW1L, SW1LM
-
+    NAME_MOD=None,  # Either DIFF, QG1L, QG1LM, SW1L, SW1LM
     # Diffusion model
-    MOD_DIFF = dict(
+    MOD_DIFF=dict(
         name_var={"SSH": "ssh"},
         var_to_save=None,
         name_init_var={},
@@ -106,9 +99,8 @@ default = dict(
         bc_name_var={},  # Dict mapping variable names to names in BC file
         bc_c_grid=False,  # Whether BC grid is C-grid (True) or A-grid (False)
     ),
-
     # 1.5-layer Quasi-Geostrophic models
-    MOD_QG1L = dict(
+    MOD_QG1L=dict(
         name_class="Qgm",  # Name of the model class in jqgm.py
         formulation="ssh",  # Dynamical formulation: 'ssh' (work in SSH space) or 'sf' (work in streamfunction space)
         name_var={
@@ -157,9 +149,8 @@ default = dict(
         bc_name_var={},  # Dict mapping variable names to names in BC file
         bc_c_grid=False,  # Whether BC grid is C-grid (True) or A-grid (False)
     ),
-
     # 1.5-layer Shallow-Water model
-    MOD_CSW1L = dict(
+    MOD_CSW1L=dict(
         # Model parameters
         name_var={"U": "u", "V": "v", "SSH": "ssh"},  # Dictionnary of variable name
         name_params=[
@@ -235,9 +226,8 @@ default = dict(
         bc_name_var={},  # Dict mapping variable names to names in BC file
         bc_c_grid=False,  # Whether BC grid is C-grid (True) or A-grid (False)
     ),
-
     # QG-SW Models
-    MOD_QGSW = dict(
+    MOD_QGSW=dict(
         name_class="qg",  # Name of the model class (either qg or sw)
         name_var={"U": "u", "V": "v", "SSH": "ssh"},
         name_init_var={},
@@ -335,9 +325,8 @@ default = dict(
         bc_name_var={},  # Dict mapping variable names to names in BC file
         bc_c_grid=True,  # Whether BC grid is C-grid (True) or A-grid (False)
     ),
-
     # Balanced Motion + Internal Tide model
-    MOD_BMIT = dict(
+    MOD_BMIT=dict(
         # Coupled BM/IT state variables. BM velocity variables are prognostic when
         # bm_model uses a shallow-water core and diagnosed when bm_model is SSH-only.
         name_var={"U_IT": "u_it", "V_IT": "v_it", "SSH_IT": "ssh_it", "U_BM": "u_bm", "V_BM": "v_bm", "SSH_BM": "ssh_bm", "SSH": "ssh"},
@@ -419,14 +408,12 @@ default = dict(
         },  # Variable names for the interaction terms
         max_nstep=240,  # maximum number of coupled model steps per JIT call.
     ),
-
     #################################################################################################################################
     # OBSERVATIONS
     #################################################################################################################################
-    NAME_OBS = None,
-
+    NAME_OBS=None,
     # L4 products (has to be on 2D latitude x longitude grids)
-    OBS_L4 = dict(
+    OBS_L4=dict(
         path="",  # path of observation netcdf file(s)
         name_time="",  # name of time coordinate
         name_lon="",  # name of longitude coordinate
@@ -437,9 +424,8 @@ default = dict(
         sigma_noise=None,  # Value of (constant) measurement error (will be used if *name_err* is not provided)
         offset=None,  # Value to add to observations
     ),
-
     # Nadir altimetry
-    OBS_SSH_NADIR = dict(
+    OBS_SSH_NADIR=dict(
         path="",  # path of observation netcdf file(s)
         name_time="",  # name of time coordinate
         name_lon="",  # name of longitude coordinate
@@ -461,9 +447,8 @@ default = dict(
         delta_t=None,  # Sampling period of the satellite (in s), used for computing geostrophic current
         velocity=None,  # Velocity of the satellite (in m/s), used for computing geostrophic current
     ),
-
     # Swath altimetry
-    OBS_SSH_SWATH = dict(
+    OBS_SSH_SWATH=dict(
         path="",  # path of observation netcdf file(s)
         name_time="",  # name of time coordinate
         name_lon="",  # name of longitude coordinate
@@ -482,13 +467,11 @@ default = dict(
         nudging_params_ssh=None,  # dictionary of nudging parameters on SSH {'sigma':<float>,'K':<float>,'Tau':<datetime.timedelta>}. Note that *sigma* parameter is useless now, and will be removed soon
         nudging_params_relvort=None,  # dictionary of nudging parameters on Relative Vorticity {'sigma':<float>,'K':<float>,'Tau':<datetime.timedelta>}. Note that *sigma* parameter is useless now, and will be removed soon
     ),
-
     #################################################################################################################################
     # OBSERVATIONAL OPERATORS
     #################################################################################################################################
-    NAME_OBSOP = None,
-
-    OBSOP_INTERP_L3 = dict(
+    NAME_OBSOP=None,
+    OBSOP_INTERP_L3=dict(
         name_obs=None,  # List of observation class names. If None, all observation will be considered.
         name_var="SSH",
         write_op=False,  # Write operator data to *path_save*
@@ -497,8 +480,7 @@ default = dict(
         Npix=4,  # Number of pixels to perform projection y=Hx
         mask_borders=False,
     ),
-
-    OBSOP_INTERP_L4 = dict(
+    OBSOP_INTERP_L4=dict(
         name_obs=None,  # List of observation class names. If None, all observation will be considered.
         name_var="SSH",
         write_op=False,  # Write operator data to *path_save*
@@ -508,21 +490,17 @@ default = dict(
         interp_method="linear",  # either 'nearest', 'linear', 'cubic' (use only 'cubic' when data is full of non-NaN)
         gradients=False,
     ),
-
     #################################################################################################################################
     # REDUCED BASIS
     #################################################################################################################################
-
-    NAME_BASIS = None,
-
+    NAME_BASIS=None,
     # Offset basis (i.e. a single basis vector with value 1 everywhere)
-    BASIS_OFFSET = dict(
+    BASIS_OFFSET=dict(
         name_mod_var=None,  # String or list of model parameter names sharing this basis
         sigma_B=None,
     ),
-
     # Gaussian basis: both 2D (space) and 3D (space+time) versions are available.
-    BASIS_GAUSS2D = dict(
+    BASIS_GAUSS2D=dict(
         super="BASIS_GAUSS2D",
         name_mod_var="",  # String or list of related model parameter names
         c_grid_var=None,  # C-grid variable type: None (default h-grid), 'U' (shape ny,nx+1), or 'V' (shape ny+1,nx)
@@ -538,8 +516,7 @@ default = dict(
         path_background=None,  # Path to a netcdf file with background control-vector values
         var_background=None,  # Variable name inside *path_background*
     ),
-
-    BASIS_GAUSS3D = dict(
+    BASIS_GAUSS3D=dict(
         name_mod_var="",  # String or list of related model parameter names
         c_grid_var=None,  # C-grid variable type: None (default h-grid), 'U' (shape ny,nx+1), or 'V' (shape ny+1,nx)
         compute_velocities=False,  # Whether to compute geostrophic velocities associated to the SSH basis vectors
@@ -560,9 +537,8 @@ default = dict(
         path_background=None,  # path netcdf file of a basis vector (e.g. coming from a previous run) to use as background
         var_background=None,  # name of the variable of the basis vector
     ),
-
     # Balanced Motions with auxilliary data
-    BASIS_BMaux = dict(
+    BASIS_BMaux=dict(
         name_mod_var=None,  # String or list of related model parameter names
         c_grid_var=None,  # C-grid variable type: None (default h-grid), 'U' (shape ny,nx+1), or 'V' (shape ny+1,nx)
         compute_velocities=False,  # Whether to compute geostrophic velocities associated to the SSH basis vectors
@@ -593,9 +569,8 @@ default = dict(
         file_facQaux=None,
         name_var_facQaux={"wavenumber": "", "lon": "", "lat": "", "var": ""},
     ),
-
     # Internal Tides boundary conditions basis (i.e. a set of basis vectors with values at the open boundaries)
-    BASIS_HBC = dict(
+    BASIS_HBC=dict(
         name_params=["hbcx", "hbcy"],  # list of parameters to control (among 'He', 'hbcx', 'hbcy', 'itg')
         ### COMMON PARAMETER ###
         # facgauss = 3.5,  # factor for gaussian spacing= both space/time
@@ -609,15 +584,12 @@ default = dict(
         Nwaves=1,  # igw frequencies (in seconds)
         Ntheta=1,  # Number of angles (computed from the normal of the border) of incoming waves,
     ),
-
-
     #################################################################################################################################
     # INVERSION METHODS
     #################################################################################################################################
-    NAME_INV = None,
-
+    NAME_INV=None,
     # 4-Dimensional Variational
-    INV_4DVAR = dict(
+    INV_4DVAR=dict(
         compute_test=False,  # TLM, ADJ & GRAD tests
         freq_it_plot=10,  # Frequency of iteration to plot the cost function and its gradient
         print_time=False,  # Whether to print the time taken for each iteration, split by model, obs operator and gradient computation
@@ -640,15 +612,12 @@ default = dict(
         path_background=None,  # Path of a control vector from another experiment to use as the background
         anomaly_from_bc=False,  # Whether to perform the minimization with anomalies from boundary condition field(s)
     ),
-
-
     #################################################################################################################################
     # DIAGNOSTICS
     #################################################################################################################################
-    NAME_DIAG = None,
-
+    NAME_DIAG=None,
     # Observatory System Simulation Experiment
-    DIAG_OSSE = dict(
+    DIAG_OSSE=dict(
         dir_output=None,
         time_min=None,
         time_max=None,
@@ -678,9 +647,8 @@ default = dict(
         name_mask=None,
         name_var_mask={"lon": "", "lat": "", "var": ""},
     ),
-
     # Observatory System Experiment (e.g. validation with real data)
-    DIAG_OSE = dict(
+    DIAG_OSE=dict(
         dir_output=None,
         time_min=None,
         time_max=None,

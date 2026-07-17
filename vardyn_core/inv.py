@@ -2,19 +2,19 @@
 Runs inversion drivers and assimilation orchestration.
 """
 
-from .config import USE_FLOAT64
+from datetime import timedelta
+import gc
+import glob
+import os
 import sys
 import time
-import numpy as np
-import os
-from datetime import timedelta
-import scipy.optimize as opt
-import gc
-import xarray as xr
-
-import glob
 
 import jax
+import numpy as np
+import scipy.optimize as opt
+import xarray as xr
+
+from .config import USE_FLOAT64
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 
@@ -310,7 +310,6 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
         gradient_max_norm = getattr(config.INV, "gradient_max_norm", None)
 
         # Run minimization
-        from decimal import Decimal
         import time
 
         class Wrapper:
@@ -344,15 +343,8 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
                 self.cache["cost"] = cost
                 self.cache["grad"] = grad
                 time0 = time.time()
-                text = (
-                    "computed in %.2E second:" % (time0 - self.time)
-                    + ", x=%.2E" % Decimal(float(x.mean()))
-                    + ", J=%.2E" % Decimal(float(cost))
-                    + ", G=%.2E" % Decimal(float(mean_grad))
-                    + ", ftol=%.2E" % Decimal(abs(float(ftol)))
-                    + ", gtol=%.2E" % Decimal(abs(float(gtol)))
-                )
-                print(f"* iteration {self.it}", text)
+                text = f"computed in {time0 - self.time:.2E} seconds:, x={x.mean():.2E}, J={cost:.2E}, G={mean_grad:.2E}, ftol={abs(ftol):.2E}, gtol={abs(gtol):.2E}"
+                print(f"* iteration {self.it}  {text}")
                 with open(self.filename_out, "a") as f:
                     f.write(f"iteration {self.it}, {text}\n")
                 self.time = time0
@@ -373,7 +365,7 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
                 if gradient_max_norm is not None and (
                     (not np.isfinite(cost)) or (not np.isfinite(grad_norm)) or grad_norm > gradient_max_norm
                 ):
-                    print(f"\nCrazy gradient detected (cost={cost}, grad_norm={grad_norm}). Will restart from best state.")
+                    print(f"\nCrazy gradient detected ({cost=}, {grad_norm=}). Will restart from best state.")
                     raise CrazyGradient()
 
                 # Check sustained convergence

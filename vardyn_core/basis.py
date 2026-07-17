@@ -2,19 +2,22 @@
 Builds reduced-basis operators and related helper models.
 """
 
-from .config import USE_FLOAT64
-import os, sys
-import numpy as np
-import logging
 import datetime
-import xarray as xr
-import scipy
-from scipy.sparse import csc_matrix
-from scipy.integrate import quad
-import jax.numpy as jnp
-from jax.experimental import sparse as sparse
-from jax import jit
+import logging
+import os
+import sys
+
 import jax
+from jax import jit
+from jax.experimental import sparse as sparse
+import jax.numpy as jnp
+import numpy as np
+import scipy
+from scipy.integrate import quad
+from scipy.sparse import csc_matrix
+import xarray as xr
+
+from .config import USE_FLOAT64
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 

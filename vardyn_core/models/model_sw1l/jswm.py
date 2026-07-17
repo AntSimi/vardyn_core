@@ -2,12 +2,11 @@
 Implements the JSWM shallow-water model with boundary handling.
 """
 
-import numpy as np
-import jax.numpy as jnp
-from jax import jit
 import jax
-from jax import checkpoint as jax_checkpoint
+from jax import checkpoint as jax_checkpoint, jit
 from jax.lax import scan
+import jax.numpy as jnp
+import numpy as np
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 

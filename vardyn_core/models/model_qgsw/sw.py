@@ -6,18 +6,16 @@ Louis Thiry, Nov 2023 for IFREMER.
 import sys
 
 sys.path.insert(0, "../../src")  # add src to path to import modules
-from src.config import USE_FLOAT64
-import numpy as np
-import jax.numpy as jnp
-import jax
-from jax import lax
-from jax import jit
-
-from finite_diff import interp_TP, interp_TP_inv, comp_ke, div_nofluxbc
+from finite_diff import comp_ke, div_nofluxbc, interp_TP, interp_TP_inv
 from flux import flux
 from helmholtz import HelmholtzNeumannSolver
+import jax
+from jax import jit, lax
+import jax.numpy as jnp
 from masks import Masks
+import numpy as np
 from reconstruction import linear2_centered, linear4_left, linear6_left, smooth_abs, wenoz4_left, wenoz6_left
+from src.config import USE_FLOAT64
 from tools import avg_pool2d
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
@@ -1218,8 +1216,8 @@ class SW:
         """
 
         import jax
-        import jax.numpy as jnp
         from jax import lax
+        import jax.numpy as jnp
 
         # ----------------------------
         # Prepare inputs

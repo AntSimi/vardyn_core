@@ -2,22 +2,23 @@
 Loads, filters, and preprocesses observation datasets.
 """
 
-import os, sys
+import os
+import sys
 
 # Disable HDF5 file locking BEFORE importing xarray/netCDF4. On shared
 # filesystems (NFS/Lustre) concurrent reads from sibling subprocesses can
 # raise "NetCDF: Not a valid ID" otherwise.
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
-import xarray as xr
-import numpy as np
-
 import datetime
-import re
-from scipy import signal
 import glob
+import re
 
-from .tools import detrendn, read_auxdata
+import numpy as np
+from scipy import signal
+import xarray as xr
+
 from .exp import Config
+from .tools import detrendn, read_auxdata
 
 # Date patterns recognized in obs file names, in order of preference.
 # Each entry is (regex, "fmt") with named groups y, m, d (d optional).
