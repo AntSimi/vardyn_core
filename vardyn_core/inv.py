@@ -343,7 +343,7 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
                 self.cache["cost"] = cost
                 self.cache["grad"] = grad
                 time0 = time.time()
-                text = f"computed in {time0 - self.time:.2E} seconds:, x={x.mean():.2E}, J={cost:.2E}, G={mean_grad:.2E}, ftol={abs(ftol):.2E}, gtol={abs(gtol):.2E}"
+                text = f"computed in {time0 - self.time:.2f} seconds:, x={x.mean():.2E}, J={cost:.2E}, G={mean_grad:.2E}, ftol={abs(ftol):.2E}, gtol={abs(gtol):.2E}"
                 print(f"* iteration {self.it}  {text}")
                 with open(self.filename_out, "a") as f:
                     f.write(f"iteration {self.it}, {text}\n")
@@ -882,7 +882,7 @@ class Variational:
                 values = np.asarray(values, dtype=float)
                 if values.size == 0:
                     return f"{name}: n=0"
-                return f"{name}: mean={values.mean():.2e}, " f"total={values.sum():.2e}, n={values.size}"
+                return f"{name}: {values.mean():.2e}s x {values.size} = {values.sum():.2f}s"
 
             print(
                 "[cost] computation time [seconds]: "

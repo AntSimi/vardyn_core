@@ -190,9 +190,10 @@ class Qgm:
         _c0 = float(self.c)
         _f0 = float(self.f0)
         _Rd = _c0 / abs(_f0) / 1e3
-        print(f"  - f\u2080 (s\u207b\u00b9):             {_f0:.4e}")
-        print(f"  - c  (m/s):              {_c0:.4f}")
-        print(f"  - Rd = c/|f\u2080| (km):   {_Rd:.1f}")
+        print(f"""  - f\u2080 (s\u207b\u00b9):             {_f0:.4e}
+  - c  (m/s):              {_c0:.4f}
+  - Rd = c/|f\u2080| (km):   {_Rd:.1f}
+""")
 
         # MDT
         self.mdt = mdt
@@ -717,7 +718,7 @@ class Qgm:
         h1, ua, va, var1, hb, varb, helmoltz_dst = X0
         h1, var1 = self.one_step_jit(h1, ua, va, var1, hb, varb, helmoltz_dst=helmoltz_dst)
         X = (h1, ua, va, var1, hb, varb, helmoltz_dst)
-
+        # FIXME pourquoi on retourne 2 fois la meme valeurs?
         return X, X
 
     def step(self, X0, Xb, nstep=1, c=None):
@@ -739,7 +740,6 @@ class Qgm:
             X1 (2D or 3D array): propagated state
 
         """
-
         ua0 = va0 = None
         if len(X0.shape) == 3:
             h0 = +X0[0]

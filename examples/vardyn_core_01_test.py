@@ -245,6 +245,7 @@ CONFIG = dict(
     NAME_INV="myINV",
     myINV=dict(
         super="INV_4DVAR",  # Inherit defaults for the 4DVar minimization driver.
+        print_time=True,
         save_minimization=True,  # Save cost-function and gradient history during minimization.
         ftol=5e-5,  # Relative cost-function decrease threshold used for convergence.
         convergence_nit=10,  # Required number of consecutive converged iterations before stopping.

@@ -14,7 +14,7 @@ import jax.numpy as jnp
 import numpy as np
 import scipy
 from scipy.integrate import quad
-from scipy.sparse import csc_matrix
+from scipy.sparse import csc_matrix, csr_matrix
 import xarray as xr
 
 from .config import USE_FLOAT64
@@ -303,7 +303,7 @@ class _Basis_gauss3d:
                 elat = np.linspace(lat - dlat, lat + dlat, 10)
                 elon2, elat2 = np.meshgrid(elon, elat)
                 std_tmp_values = sad.interp({self.name_var_sad["lon"]: elon2.ravel(), self.name_var_sad["lat"]: elat2.ravel()}).values
-                std_tmp = np.nanmean(std_tmp_values) if not np.all(np.isnan(std_tmp_values)) else 10**-10
+                std_tmp = np.nanmean(std_tmp_values) if not np.all(np.isnan(std_tmp_values)) else 1e-10
                 Q_tmp = std_tmp / ((self.facns * self.facnlt)) ** 0.5
                 Q.append(Q_tmp)
             # Repeat for all time centers
@@ -513,10 +513,10 @@ class Basis_gauss3d(_Basis_gauss3d):
     def __init__(self, config, State, multi_mode=False):
         super().__init__(config, State, multi_mode=multi_mode)
 
-        self._operg_jit = jit(self._operg)
-        self._operg_reduced_jit = jit(self._operg_reduced)
-        self._ssh2uv_adj_jit = jit(self._ssh2uv_adj)
-        self._ssh2uv_jit = jit(self._ssh2uv)
+        self._operg_jit = self._operg
+        self._operg_reduced_jit = self._operg_reduced
+        self._ssh2uv_adj_jit = self._ssh2uv_adj
+        self._ssh2uv_jit = self._ssh2uv
 
     def set_basis(self, time, return_q=False, **kwargs):
         res = super().set_basis(time, return_q=return_q, **kwargs)
@@ -524,8 +524,8 @@ class Basis_gauss3d(_Basis_gauss3d):
         self.time = time
         self.vect_time = jnp.eye(time.size)
 
-        self.zero_basis = jnp.zeros((self.nbasis,))
-        self.zero_phys = jnp.zeros((self.nphys,))
+        self.zero_basis = np.zeros(self.nbasis)
+        self.zero_phys = jnp.zeros(self.nphys)
 
         return res
 
@@ -548,9 +548,8 @@ class Basis_gauss3d(_Basis_gauss3d):
                 xx = xx[~indmask]
                 yy = yy[~indmask]
             Gauss_2d[i, indphys] = mywindow(xx / self.sigma_D) * mywindow(yy / self.sigma_D)
-        Gauss_2d = jnp.array(Gauss_2d)
-        self.Gauss_xy_T = sparse.CSR.fromdense(Gauss_2d)
-        return sparse.CSR.fromdense(Gauss_2d.T)
+        self.Gauss_xy_T = csr_matrix(Gauss_2d)
+        return csr_matrix(Gauss_2d.T)
 
     def _compute_component_time(self, time):
 
@@ -569,7 +568,8 @@ class Basis_gauss3d(_Basis_gauss3d):
                         if fact != 0:
                             Gt_np[i, ind_tmp : ind_tmp + 1] = fact
                 ind_tmp += 1
-        Gt = sparse.csr_fromdense(jnp.array(Gt_np).T)
+        # Gt = sparse.csr_fromdense(jnp.array(Gt_np).T)
+        Gt = csr_matrix(Gt_np.T)
 
         return Gt, None
 
@@ -591,7 +591,12 @@ class Basis_gauss3d(_Basis_gauss3d):
 
     def get_Gt_value(self, t):
 
-        idt = jnp.where(self.time == t, size=1)[0]  # Find index
+        # idt = jnp.where(self.time == t, size=1)[0]  # Find index
+        idt = np.where(self.time == t)[0]  # Find index
+        if idt.size == 1:
+            return self.Gauss_t[:, idt[0]].toarray()[:, 0]
+        else:
+            raise Exception("Several time step selected")
 
         return self.Gauss_t @ self.vect_time[idt[0]]  # Get corresponding value
 
@@ -1808,33 +1813,26 @@ class Basis_bmaux(_Basis_bmaux):
     def __init__(self, config, State, multi_mode=False):
         super().__init__(config, State, multi_mode=multi_mode)
 
-        # JIT
-        self._operg_jit = jit(self._operg)
-        self._operg_reduced_jit = jit(self._operg_reduced)
-        self._ssh2uv_adj_jit = jit(self._ssh2uv_adj)
-        self._ssh2uv_jit = jit(self._ssh2uv)
+        self._operg_jit = self._operg
+        self._operg_reduced_jit = self._operg_reduced
+        self._ssh2uv_adj_jit = self._ssh2uv_adj
+        self._ssh2uv_jit = self._ssh2uv
 
     def set_basis(self, time, return_q=False, **kwargs):
         res = super().set_basis(time, return_q=return_q, **kwargs)
         self.time = time
         self.vect_time = jnp.eye(time.size)
 
-        self.zero_basis = jnp.zeros((self.nbasis,))
-        self.zero_phys = jnp.zeros((self.nphys,))
+        self.zero_basis = np.zeros(self.nbasis)
+        self.zero_phys = jnp.zeros(self.nphys)
 
         return res
 
     def _compute_component_space(self):
 
-        Gx = [
-            None,
-        ] * self.nf
-        GxT = [
-            None,
-        ] * self.nf
-        Nx = [
-            None,
-        ] * self.nf
+        Gx = []
+        GxT = []
+        Nx = []
 
         for iff in range(self.nf):
 
@@ -1889,7 +1887,7 @@ class Basis_bmaux(_Basis_bmaux):
                     iwave += 1
 
             nwaves = iwave
-            Nx[iff] = nwaves
+            Nx.append(nwaves)
 
             sizes = sizes[:nwaves]
             indices = indices[:ind_tmp]
@@ -1898,9 +1896,8 @@ class Basis_bmaux(_Basis_bmaux):
             indptr = np.zeros((nwaves + 1), dtype=int)
             indptr[1:] = np.cumsum(sizes)
 
-            Gx[iff] = sparse.CSC((data, indices, indptr), shape=(self.nphys, nwaves))
-            GxT[iff] = sparse.CSR((data, indices, indptr), shape=(nwaves, self.nphys))
-
+            Gx.append(csc_matrix((data, indices, indptr), shape=(self.nphys, nwaves)))
+            GxT.append(Gx[-1].T)
         self.GxT = GxT
         return Gx, Nx
 
@@ -1921,7 +1918,8 @@ class Basis_bmaux(_Basis_bmaux):
                             fact /= self.norm_fact[iff][P]
                             Gt_np[i, ind_tmp : ind_tmp + 2 * self.ntheta] = fact
                     ind_tmp += 2 * self.ntheta
-            Gt[iff] = sparse.csr_fromdense(jnp.array(Gt_np).T)
+            # Gt[iff] = sparse.csr_fromdense(jnp.array(Gt_np).T)
+            Gt[iff] = csr_matrix(Gt_np.T)
 
         return Gt, None
 
@@ -1942,10 +1940,12 @@ class Basis_bmaux(_Basis_bmaux):
         return _u, _v
 
     def get_Gt_value(self, t, iff):
-
-        idt = jnp.where(self.time == t, size=1)[0]  # Find index
-
-        return self.Gt[iff] @ self.vect_time[idt[0]]  # Get corresponding value
+        idt = np.where(self.time == t)[0]  # Find index
+        if idt.size == 1:
+            return self.Gt[iff][:, idt[0]].toarray()[:, 0]
+        else:
+            raise Exception("Several time step selected")
+            return self.Gt[iff] @ self.vect_time[idt[0]]  # Get corresponding value
 
     def _operg(self, t, X):
         """
@@ -1978,17 +1978,17 @@ class Basis_bmaux(_Basis_bmaux):
     def _operg_reduced(self, t, phi_2d):
         """Project a 2D physical adjoint field back to reduced space."""
 
-        adX = self.zero_basis
         phi_1d = phi_2d.ravel()
 
+        adX = []
         for iff in range(self.nf):
             Gt = self.get_Gt_value(t, iff)
             Nx_val = self.Nx[iff]
             ad_space = self.GxT[iff] @ phi_1d
             adX_f = Gt.reshape((-1, Nx_val)) * ad_space[None, :]
-            adX = adX.at[self.iff_wavebounds[iff] : self.iff_wavebounds[iff + 1]].set(adX_f.ravel())
+            adX.append(adX_f.ravel())
 
-        return adX
+        return np.concatenate(adX)
 
     def operg(self, t, X, State=None):
         """
