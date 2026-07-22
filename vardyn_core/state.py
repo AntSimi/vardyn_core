@@ -7,7 +7,10 @@ import glob
 import os
 import sys
 
+import matplotlib
 import matplotlib.pyplot as plt
+
+matplotlib.use("TkAgg")
 import numpy as np
 import pandas as pd
 import pyinterp
@@ -656,7 +659,6 @@ class State:
                 self.params[name] += State1.params[name]
 
     def plot(self, title=None, cmap="RdBu_r", ind=None, name_save=None, params=False):
-
         if self.flag_plot < 1:
             return
 
@@ -683,11 +685,10 @@ class State:
         if not params:
             for ax, name_var in zip(axs, plot_keys):
                 ax.set_title(name_var)
-                _min = np.nanmin(self.var[name_var])
-                _max = np.nanmax(self.var[name_var])
-                _max_abs = np.nanmax(np.absolute(self.var[name_var]))
+                _min, _max = np.nanquantile(self.var[name_var], [0.02, 0.98])
+                _max_abs = max(abs(_min), abs(_max))
                 kw = dict()
-                if np.sign(_min) != np.sign(_max) and ((_max - np.abs(_min)) < 0.5 * _max_abs):
+                if np.sign(_min) != np.sign(_max):
                     kw = dict(cmap=cmap, vmin=-_max_abs, vmax=_max_abs)
                 im = ax.pcolormesh(self.var[name_var], shading="auto", **kw)
                 plt.colorbar(im, ax=ax)

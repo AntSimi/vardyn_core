@@ -320,15 +320,8 @@ class _Basis_gauss3d:
                 print(f"Load background from file: {self.path_background}")
                 Xb = ds[self.var_background].values[: len(Xb)]
 
-        print(
-            f"lambda={self.sigma_D:.1E}",
-            f"nlocs={ENSLAT.size:.1E}",
-            f"tdec={self.sigma_T:.1E}",
-            f"ntime={ENST.size:.1E}",
-            f"Q={np.mean(Q):.1E}",
-        )
-
-        print(f"reduced order: {time.size * self.nphys} --> {self.nbasis}\n reduced factor: {int(time.size * self.nphys / self.nbasis)}")
+        print(f"lambda={self.sigma_D:.1E} nlocs={ENSLAT.size:.1E} tdec={self.sigma_T:.1E} ntime={ENST.size:.1E} Q={np.mean(Q):.1E}")
+        print(f"reduced order: {time.size * self.nphys} --> {self.nbasis} => reduced factor: {int(time.size * self.nphys / self.nbasis)}")
 
         # Compute basis components
         Gauss_xy = self._compute_component_space()
@@ -536,20 +529,19 @@ class Basis_gauss3d(_Basis_gauss3d):
 
         Gauss_2d = np.zeros((self.ENSLAT.size, self.lon1d.size))
         for i, (lat0, lon0) in enumerate(zip(self.ENSLAT, self.ENSLON)):
-            indphys = np.where(
-                (np.abs((np.mod(self.lon1d - lon0 + 180, 360) - 180) / self.km2deg * np.cos(lat0 * np.pi / 180.0)) <= self.sigma_D)
-                & (np.abs((self.lat1d - lat0) / self.km2deg) <= self.sigma_D)
-            )[0]
-            xx = (np.mod(self.lon1d[indphys] - lon0 + 180, 360) - 180) / self.km2deg * np.cos(lat0 * np.pi / 180.0)
-            yy = (self.lat1d[indphys] - lat0) / self.km2deg
+            dx = (np.mod(self.lon1d - lon0 + 180, 360) - 180) / self.km2deg * np.cos(lat0 * np.pi / 180.0)
+            dy = (self.lat1d - lat0) / self.km2deg
+            indphys = np.where((np.abs(dx) <= self.sigma_D) & (np.abs(dy) <= self.sigma_D))[0]
+            dx = dx[indphys]
+            dy = dy[indphys]
             if self.mask1d is not None:
                 indmask = self.mask1d[indphys]
                 indphys = indphys[~indmask]
-                xx = xx[~indmask]
-                yy = yy[~indmask]
-            Gauss_2d[i, indphys] = mywindow(xx / self.sigma_D) * mywindow(yy / self.sigma_D)
-        self.Gauss_xy_T = csr_matrix(Gauss_2d)
-        return csr_matrix(Gauss_2d.T)
+                dx = dx[~indmask]
+                dy = dy[~indmask]
+            Gauss_2d[i, indphys] = mywindow(dx / self.sigma_D) * mywindow(dy / self.sigma_D)
+        self.Gauss_xy_T = csc_matrix(Gauss_2d)
+        return csc_matrix(Gauss_2d.T)
 
     def _compute_component_time(self, time):
 
@@ -568,7 +560,6 @@ class Basis_gauss3d(_Basis_gauss3d):
                         if fact != 0:
                             Gt_np[i, ind_tmp : ind_tmp + 1] = fact
                 ind_tmp += 1
-        # Gt = sparse.csr_fromdense(jnp.array(Gt_np).T)
         Gt = csr_matrix(Gt_np.T)
 
         return Gt, None
@@ -590,8 +581,6 @@ class Basis_gauss3d(_Basis_gauss3d):
         return _u, _v
 
     def get_Gt_value(self, t):
-
-        # idt = jnp.where(self.time == t, size=1)[0]  # Find index
         idt = np.where(self.time == t)[0]  # Find index
         if idt.size == 1:
             return self.Gauss_t[:, idt[0]].toarray()[:, 0]
@@ -604,7 +593,6 @@ class Basis_gauss3d(_Basis_gauss3d):
         """
         Project to physicial space
         """
-
         # Initialize phi
         phi = self.zero_phys.ravel()
 
@@ -615,10 +603,7 @@ class Basis_gauss3d(_Basis_gauss3d):
         reshaped_GtX = GtX.reshape((-1, self.Nx))
 
         phi += self.Gauss_xy @ (reshaped_GtX.sum(axis=0))
-
-        phi = phi.reshape(self.shape_phys)
-
-        return phi
+        return phi.reshape(self.shape_phys)
 
     def _operg_reduced(self, t, phi_2d):
         """Project a 2D physical adjoint field back to reduced space."""
@@ -677,7 +662,6 @@ class Basis_gauss3d(_Basis_gauss3d):
             if self.compute_velocities:
                 adState[self.name_mod_u] *= 0.0
                 adState[self.name_mod_v] *= 0.0
-
         return adX
 
 
@@ -868,10 +852,8 @@ class _Basis_gauss2d:
                 print(f"Load background from file: {self.path_background}")
                 Xb = ds[self.var_background].values[: len(Xb)]
 
-        print(f"sigma_D={self.sigma_D:.1E}", f"nlocs={ENSLAT.size:.1E}", f"Q={np.mean(Q):.1E}")
-        print(
-            f"reduced order: {time.size * self.nphys} --> {self.nbasis}\n" f" reduced factor: {int(time.size * self.nphys / self.nbasis)}"
-        )
+        print(f"sigma_D={self.sigma_D:.1E} nlocs={ENSLAT.size:.1E} Q={np.mean(Q):.1E}")
+        print(f"reduced order: {time.size * self.nphys} --> {self.nbasis} => reduced factor: {int(time.size * self.nphys / self.nbasis)}")
 
         # Compute spatial basis matrix
         self.Gauss_xy = self._compute_component_space()
@@ -1569,8 +1551,7 @@ class _Basis_bmaux:
         print("Computing Time components")
         self.Gt, self.Nt = self._compute_component_time(time)  # in time
 
-        print(f"reduced order: {time.size * self.nphys} --> {self.nbasis}\n reduced factor: {int(time.size * self.nphys / self.nbasis)}")
-
+        print(f"reduced order: {time.size * self.nphys} --> {self.nbasis} => reduced factor: {int(time.size * self.nphys / self.nbasis)}")
         if return_q:
             return Xb, Q
 
@@ -1845,12 +1826,11 @@ class Basis_bmaux(_Basis_bmaux):
 
             for P in range(self.NP[iff]):
                 # Obs selection around point P
-                indphys = np.where(
-                    (np.abs((self.lon1d - self.ENSLON[iff][P]) / self.km2deg * np.cos(self.ENSLAT[iff][P] * np.pi / 180.0)) <= self.DX[iff])
-                    & (np.abs((self.lat1d - self.ENSLAT[iff][P]) / self.km2deg) <= self.DX[iff])
-                )[0]
-                xx = (self.lon1d[indphys] - self.ENSLON[iff][P]) / self.km2deg * np.cos(self.ENSLAT[iff][P] * np.pi / 180.0)
-                yy = (self.lat1d[indphys] - self.ENSLAT[iff][P]) / self.km2deg
+                dx = (self.lon1d - self.ENSLON[iff][P]) / self.km2deg * np.cos(self.ENSLAT[iff][P] * np.pi / 180.0)
+                dy = (self.lat1d - self.ENSLAT[iff][P]) / self.km2deg
+                indphys = np.where((np.abs(dx) <= self.DX[iff]) & (np.abs(dy) <= self.DX[iff]))[0]
+                xx = dx[indphys]
+                yy = dy[indphys]
                 # Spatial tapering shape of the wavelet
                 if self.mask1d is not None:
                     indmask = self.mask1d[indphys]
@@ -1954,7 +1934,6 @@ class Basis_bmaux(_Basis_bmaux):
 
         # Initialize phi
         phi = self.zero_phys.ravel()
-
         for iff in range(self.nf):
 
             Gt = self.get_Gt_value(t, iff)
@@ -1972,7 +1951,6 @@ class Basis_bmaux(_Basis_bmaux):
 
         # Reshape phi back to physical space shape
         phi = phi.reshape(self.shape_phys)
-
         return phi
 
     def _operg_reduced(self, t, phi_2d):

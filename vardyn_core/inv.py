@@ -273,7 +273,7 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
             time0 = time.time()
             J, G = raw_fun(XX)
             _block_until_ready((J, G))
-            print("[cost] first evaluation compile+run time: {:.2f} seconds".format(time.time() - time0))
+            print("[cost & grad] first evaluation compile+run time: {:.2f} seconds".format(time.time() - time0))
             return J, G
 
         # Callback function called at every minimization iterations
@@ -807,7 +807,17 @@ class Variational:
 
         # Cost function (float64 for L-BFGS-B line-search stability)
         J = np.float64(0.5 * (Jo + Jb))
-
+        if self.print_time:
+            print(
+                "[cost] computation time [seconds]: "
+                + ", ".join(
+                    [
+                        _time_stats("misfit", cost_misfit),
+                        _time_stats("basis", cost_basis),
+                        _time_stats("model", cost_model),
+                    ]
+                )
+            )
         ########################################
         # GRAD FUNCTION
         ########################################
@@ -877,23 +887,6 @@ class Variational:
                     )
 
         if self.print_time:
-
-            def _time_stats(name, values):
-                values = np.asarray(values, dtype=float)
-                if values.size == 0:
-                    return f"{name}: n=0"
-                return f"{name}: {values.mean():.2e}s x {values.size} = {values.sum():.2f}s"
-
-            print(
-                "[cost] computation time [seconds]: "
-                + ", ".join(
-                    [
-                        _time_stats("misfit", cost_misfit),
-                        _time_stats("basis", cost_basis),
-                        _time_stats("model", cost_model),
-                    ]
-                )
-            )
             print(
                 "[grad] computation time [seconds]: "
                 + ", ".join(
@@ -948,3 +941,10 @@ def plot_grad_test(L):
     ax.set_xlabel("order")
     ax.invert_xaxis()
     plt.show()
+
+
+def _time_stats(name, values):
+    values = np.asarray(values, dtype=float)
+    if values.size == 0:
+        return f"{name}: n=0"
+    return f"{name}: {values.mean():.2e}s x {values.size} = {values.sum():.2f}s"

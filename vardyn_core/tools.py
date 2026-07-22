@@ -280,8 +280,7 @@ def detrendn(da, axes=None):
 def read_auxdata(file_aux, name_var, lon_unit):
 
     # Read database
-    ds = xr.open_dataset(file_aux)
-
+    ds = xr.open_dataset(file_aux, decode_times=False)
     if np.sign(ds[name_var["lon"]].data.min()) == -1 and lon_unit == "0_360":
         ds = ds.assign_coords({name_var["lon"]: ((name_var["lon"], ds[name_var["lon"]].data % 360))})
     elif (np.sign(ds[name_var["lon"]].data.min()) == 1 or ds[name_var["lon"]].data.max() > 180) and lon_unit == "-180_180":
@@ -290,14 +289,13 @@ def read_auxdata(file_aux, name_var, lon_unit):
 
     lon = ds[name_var["lon"]].values
     lat = ds[name_var["lat"]].values
-    if "data" in name_var:
-        data = ds[name_var["data"]].values.squeeze()
-    elif "mdt" in name_var:
-        data = ds[name_var["mdt"]].values.squeeze()
-    elif "var" in name_var:
-        data = ds[name_var["var"]].values.squeeze()
+    for k, v in name_var.items():
+        if k in ("lon", "lat"):
+            continue
+        data = ds[v].values.squeeze()
 
     if len(np.shape(data)) == 3:
+        # FIXME on ne tien pas compte de la variabilité saisoniere du bruit
         data = np.mean(data, 0)
 
     if data.shape[1] == lon.size:
@@ -307,7 +305,6 @@ def read_auxdata(file_aux, name_var, lon_unit):
         finterp = scipy.interpolate.RegularGridInterpolator((lon, lat), data, bounds_error=False, fill_value=None)
     else:
         finterp = scipy.interpolate.LinearNDInterpolator(list(zip(lon.ravel(), lat.ravel())), data.ravel())
-
     return finterp
 
 

@@ -19,6 +19,7 @@ import jax
 from jax import jit
 import jax.numpy as jnp
 import matplotlib.pylab as plt
+from netCDF4 import Dataset
 import numpy as np
 import pyinterp
 from scipy.interpolate import griddata
@@ -40,7 +41,7 @@ def _open_obs_file(path, _retries=4, _sleep=0.5):
     last_exc = None
     for _i in range(_retries):
         try:
-            return xr.open_dataset(path)
+            return Dataset(path)
         except Exception as e:
             last_exc = e
             _time.sleep(_sleep * (2**_i))
@@ -268,11 +269,11 @@ class Obsop_interp_l3(Obsop_interp):
         try:
             row, col = np.where(valid_mask)
             data = weights[row, col]
-            indices = jnp.array([row, ind_closest[row, col]])
-            data = jnp.array(data)
+            indices = np.array([row, ind_closest[row, col]])
+            data = np.array(data)
         except:
-            data = jnp.array([])
-            indices = jnp.array([])
+            data = np.array([])
+            indices = np.array([])
 
         return data, indices
 
@@ -334,14 +335,14 @@ class Obsop_interp_l3(Obsop_interp):
 
                 with _open_obs_file(obs_file) as ncin:
 
-                    lon = ncin[sat_info["name_lon"]].values
-                    lat = ncin[sat_info["name_lat"]].values
+                    lon = ncin[sat_info["name_lon"]][:]
+                    lat = ncin[sat_info["name_lat"]][:]
 
-                    if self.name_var not in ncin:
+                    if self.name_var not in ncin.variables:
                         continue
 
                     # Observed variable
-                    var = ncin[self.name_var].values
+                    var = ncin[self.name_var][:]
 
                     # Reshape to 1D arrays
                     lon = lon.ravel()
@@ -350,8 +351,8 @@ class Obsop_interp_l3(Obsop_interp):
 
                     # Observed error
                     name_err = self.name_var + "_err"
-                    if name_err in ncin:
-                        err = ncin[name_err].values.ravel()
+                    if name_err in ncin.variables:
+                        err = ncin[name_err][:].ravel()
                     elif sat_info["sigma_noise"] is not None:
                         err = sat_info["sigma_noise"] * np.ones_like(var)
                     else:
@@ -588,55 +589,50 @@ class Obsop_interp_l4(Obsop_interp):
                 if obs_name not in self.name_obs:
                     continue
 
-                try:
+                with _open_obs_file(obs_file) as ncin:
 
-                    with _open_obs_file(obs_file) as ncin:
+                    lon = ncin[sat_info["name_lon"]][:]
+                    lat = ncin[sat_info["name_lat"]][:]
 
-                        lon = ncin[sat_info["name_lon"]].values
-                        lat = ncin[sat_info["name_lat"]].values
+                    # Check if this observation class is wanted
+                    if self.name_var not in ncin.variables:
+                        continue
 
-                        # Check if this observation class is wanted
-                        if self.name_var not in ncin:
-                            continue
+                    # Observed variable
+                    var = ncin[self.name_var][:]
 
-                        # Observed variable
-                        var = ncin[self.name_var].values
+                    if lon.size != var.size and len(lon.shape) == 1:  # 2D regular grid
+                        lon, lat = np.meshgrid(lon, lat)
 
-                        if lon.size != var.size and len(lon.shape) == 1:  # 2D regular grid
-                            lon, lat = np.meshgrid(lon, lat)
+                    # Observed error
+                    name_err = self.name_var + "_err"
+                    if name_err in ncin.variables:
+                        err = ncin[name_err][:]
+                    elif sat_info["sigma_noise"] is not None:
+                        err = sat_info["sigma_noise"] * np.ones_like(var)
+                    else:
+                        err = np.ones_like(var)
+                    err[np.isnan(var)] = np.nan
 
-                        # Observed error
-                        name_err = self.name_var + "_err"
-                        if name_err in ncin:
-                            err = ncin[name_err].values
-                        elif sat_info["sigma_noise"] is not None:
-                            err = sat_info["sigma_noise"] * np.ones_like(var)
-                        else:
-                            err = np.ones_like(var)
-                        err[np.isnan(var)] = np.nan
+                    # Representativeness inflation when obs pixels are
+                    # finer than the model grid (averaging ~_err_res
+                    # independent samples per cell -> sqrt(N) reduction
+                    # cancels into a sqrt(_err_res) inflation of the
+                    # per-cell error under the i.i.d. assumption).
+                    # Skip when obs are coarser than the grid: the same
+                    # obs is reused across neighbouring cells, so the
+                    # per-cell noise stays at the sensor noise (spatial
+                    # correlation between cells is not represented here).
+                    dx, dy = grid.lonlat2dxdy(lon, lat)
+                    _err_res = np.nanmean(dx * dy) / np.nanmean(self.DX * self.DY)
+                    if _err_res > 1:
+                        err *= np.sqrt(_err_res)
 
-                        # Representativeness inflation when obs pixels are
-                        # finer than the model grid (averaging ~_err_res
-                        # independent samples per cell -> sqrt(N) reduction
-                        # cancels into a sqrt(_err_res) inflation of the
-                        # per-cell error under the i.i.d. assumption).
-                        # Skip when obs are coarser than the grid: the same
-                        # obs is reused across neighbouring cells, so the
-                        # per-cell noise stays at the sensor noise (spatial
-                        # correlation between cells is not represented here).
-                        dx, dy = grid.lonlat2dxdy(lon, lat)
-                        _err_res = np.nanmean(dx * dy) / np.nanmean(self.DX * self.DY)
-                        if _err_res > 1:
-                            err *= np.sqrt(_err_res)
-
-                        # Append to lists
-                        var_obs.append(+var.flatten())
-                        err_obs.append(+err.flatten())
-                        lon_obs.append(+lon.flatten())
-                        lat_obs.append(+lat.flatten())
-                except:
-                    print(f"Warning: problem reading {obs_file}")
-                    continue
+                    # Append to lists
+                    var_obs.append(+var.flatten())
+                    err_obs.append(+err.flatten())
+                    lon_obs.append(+lon.flatten())
+                    lat_obs.append(+lat.flatten())
 
             if len(var_obs) == 0:
                 # remove date from list

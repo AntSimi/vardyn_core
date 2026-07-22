@@ -3,6 +3,7 @@ Implements the model factory and dynamical model classes.
 """
 
 from datetime import timedelta
+from glob import glob
 from math import pi
 import os
 import sys
@@ -100,8 +101,7 @@ class _BcFields:
 
         dlon = np.nanmean(self.lon[:, 1:] - self.lon[:, :-1])
         dlat = np.nanmean(self.lat[1:, :] - self.lat[:-1, :])
-
-        _ds = xr.open_mfdataset(config_bc.file)
+        _ds = xr.open_mfdataset(sorted(glob(config_bc.file)), chunks=-1)[list(config_bc.name_var.values())].load()
         # FIXME Un load suffit ??
         ds = _ds.copy()
         _ds.close()
@@ -114,38 +114,22 @@ class _BcFields:
             ds = ds.sortby(ds[config_bc.name_lon])
         except Exception:
             print("Warning: can't convert longitude coordinates in " + config_bc.file)
-
         self.name_time_bc = config_bc.name_time
         has_time = config_bc.name_time is not None and config_bc.name_time in ds
         time_bc = ds[config_bc.name_time].values if has_time else None
-        lon_bc = ds[config_bc.name_lon].values
-        lat_bc = ds[config_bc.name_lat].values
-        dlon += np.nanmean(lon_bc[1:] - lon_bc[:-1])
-        dlat += np.nanmean(lat_bc[1:] - lat_bc[:-1])
         if has_time and np.size(time_bc) > 1:
             dtime = time_bc[1] - time_bc[0]
-            try:
-                ds = ds.sel(
-                    {
-                        config_bc.name_time: slice(
-                            np.datetime64(config_bc._config.EXP.init_date) - dtime,
-                            np.datetime64(config_bc._config.EXP.final_date) + dtime,
-                        ),
-                    }
-                )
-            except Exception:
-                ds = ds.where(
-                    (ds[config_bc.name_time] >= np.datetime64(config_bc._config.EXP.init_date) - dtime)
-                    & (ds[config_bc.name_time] <= np.datetime64(config_bc._config.EXP.final_date) + dtime),
-                    drop=True,
-                )
+            t0 = np.datetime64(config_bc._config.EXP.init_date) - dtime
+            t1 = np.datetime64(config_bc._config.EXP.final_date) + dtime
+            ds = ds.sel({config_bc.name_time: slice(t0, t1)})
         if len(ds[config_bc.name_lon].shape) == 1 and len(ds[config_bc.name_lat].shape) == 1:
-            ds = ds.sel(
-                {
-                    config_bc.name_lon: slice(lon_min - 2 * dlon, lon_max + 2 * dlon),
-                    config_bc.name_lat: slice(lat_min - 2 * dlat, lat_max + 2 * dlat),
-                }
-            )
+            lon_bc = ds[config_bc.name_lon].values
+            lat_bc = ds[config_bc.name_lat].values
+            dlon += np.nanmean(lon_bc[1:] - lon_bc[:-1])
+            dlat += np.nanmean(lat_bc[1:] - lat_bc[:-1])
+            slx = slice(lon_min - 2 * dlon, lon_max + 2 * dlon)
+            sly = slice(lat_min - 2 * dlat, lat_max + 2 * dlat)
+            ds = ds.sel({config_bc.name_lon: slx, config_bc.name_lat: sly})
 
         self.c_grid = getattr(config_bc, "c_grid", False)
         self.name_lon_bc = config_bc.name_lon
@@ -156,7 +140,7 @@ class _BcFields:
 
         self.var = {}
         for name in config_bc.name_var:
-            self.var[name] = ds[config_bc.name_var[name]].load()
+            self.var[name] = ds[config_bc.name_var[name]]
         ds.close()
 
     def interp(self, time):
@@ -625,12 +609,7 @@ class M:
 
         bc_fields = []
         for bc_config in bc_sources:
-            try:
-                bc_fields.append(_BcFields(bc_config, State))
-            except Exception as e:
-                import warnings
-
-                warnings.warn(f"Failed to load boundary conditions from {bc_config.file}: {e}")
+            bc_fields.append(_BcFields(bc_config, State))
         if len(bc_fields) == 1:
             self._bc_fields = bc_fields[0]
         elif len(bc_fields) > 1:
@@ -967,7 +946,7 @@ class Model_qg1l(M):
             if config.MOD.cmax is not None:
                 self.c[self.c > config.MOD.cmax] = config.MOD.cmax
 
-            if config.EXP.flag_plot > 0:
+            if config.EXP.flag_plot > 1:
                 plt.figure()
                 plt.pcolormesh(self.c)
                 plt.colorbar()
@@ -994,7 +973,7 @@ class Model_qg1l(M):
             self.mdt = grid.interp2d(ds, config.MOD.name_var_mdt, State.lon, State.lat)
             self.mdt[np.isnan(self.mdt)] = 0
 
-            if config.EXP.flag_plot > 0:
+            if config.EXP.flag_plot > 1:
                 plt.figure()
                 plt.pcolormesh(self.mdt)
                 plt.colorbar()
@@ -1339,17 +1318,11 @@ class Model_qg1l(M):
                 self.bc_values[name] = np.array(list(self.bc["SSH"].values()))
 
     def _apply_bc(self, t0, t1):
-
-        Xb = jnp.zeros(
-            (
-                self.ny,
-                self.nx,
-            )
-        )
-
         if "SSH" not in self.bc:
+            Xb = np.zeros((self.ny, self.nx))
             return Xb
         elif len(self.bc["SSH"].keys()) == 0:
+            Xb = np.zeros((self.ny, self.nx))
             return Xb
         elif t0 not in self.bc_time:
             # Find closest time
@@ -1385,20 +1358,20 @@ class Model_qg1l(M):
         c_eff = (self.qgm.c + State.params["c"].astype(self.qgm.dtype)) if "c" in self.name_params else None
 
         # Get state variable(s)
-        X0 = State.getvar(name_var=self.name_var["SSH"])
+        X0 = [State.getvar(name_var=self.name_var["SSH"])]
         if self.advect_tracer:
-            X0 = X0[np.newaxis, :, :]
             # Ageostrophic velocities
             if self.ageo_velocities:
-                U = State.getvar(name_var=self.name_var["U"])[np.newaxis, :, :]
-                V = State.getvar(name_var=self.name_var["V"])[np.newaxis, :, :]
-                X0 = jnp.append(X0, U, axis=0)
-                X0 = jnp.append(X0, V, axis=0)
+                X0.append(State.getvar(name_var=self.name_var["U"]))
+                X0.append(State.getvar(name_var=self.name_var["V"]))
             # Tracers
             for name in self.name_var:
                 if name not in ["SSH", "U", "V"]:
-                    C0 = State.getvar(name_var=self.name_var[name])[jnp.newaxis, :, :]
-                    X0 = jnp.append(X0, C0, axis=0)
+                    X0.append(State.getvar(name_var=self.name_var[name]))
+        if len(X0) == 1:
+            X0 = X0[0]
+        else:
+            X0 = np.stack(X0)
 
         # init
         X1 = +X0
@@ -1509,8 +1482,8 @@ class Model_qg1l(M):
         adSSH0 = adState.getvar(name_var=self.name_var["SSH"])  # .astype('float64')
         SSH0 = State.getvar(name_var=self.name_var["SSH"])  # .astype('float64')
         if self.advect_tracer:
-            adX0 = adSSH0[jnp.newaxis, :, :]
-            X0 = SSH0[jnp.newaxis, :, :]
+            adX0 = adSSH0[np.newaxis, :, :]
+            X0 = SSH0[np.newaxis, :, :]
             # Ageostrophic velocities
             if self.ageo_velocities:
                 U = State.getvar(name_var=self.name_var["U"])[np.newaxis, :, :]
@@ -1524,10 +1497,10 @@ class Model_qg1l(M):
             # Tracers
             for name in self.name_var:
                 if name not in ["SSH", "U", "V"]:
-                    adC0 = adState.getvar(name_var=self.name_var[name])[jnp.newaxis, :, :]
-                    adX0 = jnp.append(adX0, adC0, axis=0)
-                    C0 = State.getvar(name_var=self.name_var[name])[jnp.newaxis, :, :]
-                    X0 = jnp.append(X0, C0, axis=0)
+                    adC0 = adState.getvar(name_var=self.name_var[name])[np.newaxis, :, :]
+                    adX0 = np.append(adX0, adC0, axis=0)
+                    C0 = State.getvar(name_var=self.name_var[name])[np.newaxis, :, :]
+                    X0 = np.append(X0, C0, axis=0)
         else:
             adX0 = adSSH0
             X0 = SSH0
@@ -2237,7 +2210,7 @@ class Model_csw1l(_ITOpenBoundaryExtensionMixin, M):
 
     def _compute_bm_fields(self, path_bm, name_var_bm, State):
 
-        dsbm = xr.open_mfdataset(path_bm, chunks=None)
+        dsbm = xr.open_mfdataset(path_bm, chunks=-1)
         name_lon_bm = name_var_bm["lon"]
         name_lat_bm = name_var_bm["lat"]
 
@@ -3699,7 +3672,7 @@ class Model_qgsw(M):
 
         nv = getattr(config.MOD, "name_var_wind", {"lon": "longitude", "lat": "latitude", "time": "time", "u10": "u10", "v10": "v10"})
 
-        ds = xr.open_mfdataset(path_wind)
+        ds = xr.open_mfdataset(path_wind, chunks=-1)
 
         # --- longitude convention ---
         lon_vals = ds[nv["lon"]].values

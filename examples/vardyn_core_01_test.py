@@ -59,7 +59,7 @@ CONFIG = dict(
         final_date=datetime(2025, 7, 1, 0),  # Last analysis time, as datetime(year, month, day, hour).
         assimilation_time_step=timedelta(hours=6),  # Time spacing between two assimilated model states.
         saveoutput_time_step=timedelta(hours=6),  # Time spacing between saved output states.
-        flag_plot=1,  # Plotting level for quick-look/debug figures.
+        flag_plot=0,  # Plotting level for quick-look/debug figures.
         write_obs=True,  # Save preprocessed observations for reuse.
         path_obs=f"{myPath}/obs",  # Directory used to save/read cached preprocessed observations.
     ),
