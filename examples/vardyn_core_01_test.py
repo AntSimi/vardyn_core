@@ -7,6 +7,9 @@ This configuration file is only a template and should be modified according to t
 from datetime import datetime, timedelta
 import os
 
+os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1"
+
+
 import matplotlib.pyplot as plt
 
 from vardyn_core import basis, exp, inv, mod, obs, obsop, state
@@ -68,10 +71,10 @@ CONFIG = dict(
         super="GRID_GEO",  # Inherit defaults for a regular longitude/latitude grid.
         # lon_min=0, lon_max=50.0,
         # lat_min=-45.0, lat_max=-20.0,
-        lon_min=10,
-        lon_max=20.0,
+        lon_min=0,
+        lon_max=50.0,
         lat_min=-45.0,
-        lat_max=-36,
+        lat_max=-20,
         dlon=0.1,  # Longitude grid spacing, in degrees.
         dlat=0.1,  # Latitude grid spacing, in degrees.
         name_init_mask=path_mdt,  # Here the mask is set using the MDT file. The mask is set to 1 where the MDT is NaN (i.e. Land) and 0 where it is not NaN (i.e. Ocean).
