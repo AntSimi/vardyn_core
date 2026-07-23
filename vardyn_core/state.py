@@ -9,14 +9,14 @@ import sys
 
 import matplotlib
 import matplotlib.pyplot as plt
-
-matplotlib.use("TkAgg")
 import numpy as np
 import pandas as pd
 import pyinterp
 import xarray as xr
 
 from . import tools as grid
+
+matplotlib.use("TkAgg")
 
 
 class State:
