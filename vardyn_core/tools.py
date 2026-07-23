@@ -240,12 +240,12 @@ def detrendn(da, axes=None):
         for i in range(N[0]):
             G[N[1] * i : N[1] * i + N[1], 1] = i + 1
             G[N[1] * i : N[1] * i + N[1], 2] = np.arange(1, N[1] + 1)
-        if type(da) == xr.DataArray:
+        if isinstance(da, xr.DataArray):
             d_obs = np.reshape(da.copy().values, (N[0] * N[1], 1))
         else:
             d_obs = np.reshape(da.copy(), (N[0] * N[1], 1))
     elif len(N) == 3:
-        if type(da) == xr.DataArray:
+        if isinstance(da, xr.DataArray):
             if da.ndim > 3:
                 raise NotImplementedError(
                     "Cubic detrend is not implemented "

@@ -14,7 +14,7 @@ import jax.numpy as jnp
 import numpy as np
 import scipy
 from scipy.integrate import quad
-from scipy.sparse import csc_matrix, csr_matrix
+from scipy.sparse import csc_matrix
 import xarray as xr
 
 from .config import USE_FLOAT64
@@ -2688,7 +2688,7 @@ class _Basis_offset:
         self.nx = State.nx
         self.sigma_B = config.BASIS.sigma_B
 
-        if self.sigma_B == None:
+        if self.sigma_B is None:
             print("Warning, please prescribe sigma_B for Basis Offset")
 
         self.multi_mode = multi_mode

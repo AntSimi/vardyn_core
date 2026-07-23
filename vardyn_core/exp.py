@@ -3,8 +3,6 @@ Loads and merges experiment configuration files.
 """
 
 from copy import deepcopy
-import os
-import sys
 
 
 class Config(dict):
@@ -23,7 +21,7 @@ class Config(dict):
     def copy(self):
         other = {}
         for key, val in self.items():
-            if type(val) == dict:
+            if isinstance(val, dict):
                 other[key] = deepcopy(val)
             else:
                 other[key] = val
@@ -40,7 +38,7 @@ def _merge_configs(config_exp, config_def, NAME):
     for key in dict_def:
         if key in dict_exp:
             # Check if we have encapsulated super class
-            if type(dict_exp[key]) == dict and "super" in dict_exp[key]:
+            if isinstance(dict_exp[key], dict) and "super" in dict_exp[key]:
                 # If yes, we merge with default config
                 _dict_def = getattr(config_def, dict_exp[key]["super"])
                 for _key in _dict_def:
@@ -55,7 +53,7 @@ def _merge_configs(config_exp, config_def, NAME):
 
 def merge_configs(config_exp, config_def, name):
     NAME = config_exp.get(name)
-    if type(NAME) == list:
+    if isinstance(NAME, list):
         config = {}
         for _NAME in NAME:
             config[_NAME] = _merge_configs(config_exp, config_def, _NAME)

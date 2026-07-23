@@ -18,8 +18,6 @@ import pyinterp.fill
 import xarray as xr
 
 from .config import USE_FLOAT64
-
-# from importlib.machinery import SourceFileLoader
 from .models import REGISTERED_SUBMODEL
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
@@ -152,9 +150,9 @@ class _BcFields:
             else:
                 sys.exit("Time dimension must be 1D or 0D")
 
-        if time.size > 1 and type(time[0]) != np.datetime64:
+        if time.size > 1 and not isinstance(time[0], np.datetime64):
             time = np.array([np.datetime64(dt) for dt in time])
-        elif time.size == 1 and type(time) != np.datetime64:
+        elif time.size == 1 and not isinstance(time, np.datetime64):
             time = np.array([np.datetime64(time)])
 
         if len(self.lon_bc.shape) == 1 and len(self.lat_bc.shape) == 1:
@@ -777,7 +775,7 @@ class Model_diffusion(M):
 
     def init(self, State, t0=0):
 
-        if type(self.init_from_bc) == dict:
+        if isinstance(self.init_from_bc, dict):
             for name in self.init_from_bc:
                 if self.init_from_bc[name] and name in self.bc and t0 in self.bc[name]:
                     State.setvar(self.bc[name][t0], self.name_var[name])
@@ -1187,7 +1185,7 @@ class Model_qg1l(M):
         if self.anomaly_from_bc:
             self._set_land_nan(State)
             return
-        elif type(self.init_from_bc) == dict:
+        elif isinstance(self.init_from_bc, dict):
             for name in self.init_from_bc:
                 if self.init_from_bc[name] and t0 in self.bc[name]:
                     State.setvar(self.bc[name][t0], self.name_var[name])
@@ -3794,7 +3792,7 @@ class Model_qgsw(M):
 
     def init(self, State, t0=0):
 
-        if type(self.init_from_bc) == dict:
+        if isinstance(self.init_from_bc, dict):
             if "SSH" in self.init_from_bc:
                 u0 = self.bc["U"][t0]
                 v0 = self.bc["V"][t0]
@@ -6297,7 +6295,7 @@ class Model_bmit(_ITOpenBoundaryExtensionMixin, M):
                 State.setvar(values, names)
 
         if self.bm_kind == "MOD_QG1L":
-            if type(self.init_from_bc_bm) == dict:
+            if isinstance(self.init_from_bc_bm, dict):
                 for name in self.init_from_bc_bm:
                     bmit_name = {"U": "U_BM", "V": "V_BM", "SSH": "SSH_BM"}.get(name, name)
                     if self.init_from_bc_bm[name] and t0 in self.bc[bmit_name]:

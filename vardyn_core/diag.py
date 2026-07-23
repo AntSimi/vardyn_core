@@ -661,7 +661,7 @@ That could be due to non regular grid or bad written netcdf file")
         # Rechunk
         if dim is not None:
             chunks = {}
-            if type(dim) != list:
+            if not isinstance(dim, list):
                 dim = [dim]
             for d in dim:
                 chunks[d] = da[d].size

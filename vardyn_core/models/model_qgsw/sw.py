@@ -469,8 +469,8 @@ class SW:
 
     def set_wind_forcing(self, taux, tauy):
         nx, ny = self.nx, self.ny
-        assert type(taux) == float or taux.shape == (nx - 1, ny), f"taux must be a float or a {(nx - 1, ny)} Tensor"
-        assert type(tauy) == float or tauy.shape == (nx, ny - 1), f"tauy must be a float or a {(nx, ny - 1)} Tensor"
+        assert isinstance(taux, float) or taux.shape == (nx - 1, ny), f"taux must be a float or a {(nx - 1, ny)} Tensor"
+        assert isinstance(tauy, float) or tauy.shape == (nx, ny - 1), f"tauy must be a float or a {(nx, ny - 1)} Tensor"
         self.taux = taux
         self.tauy = tauy
 

@@ -1058,7 +1058,7 @@ def plot_subdomains(lonlat_grid):
     # Add colorbar
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)  # Create ScalarMappable
     sm.set_array([])  # Dummy array for colorbar
-    cbar = plt.colorbar(sm, ax=ax, label="Spatial resolution (km)")  # Add colorbar
+    plt.colorbar(sm, ax=ax, label="Spatial resolution (km)")  # Add colorbar
 
     # Add features
     ax.set_global()
