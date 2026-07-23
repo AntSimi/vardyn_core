@@ -515,10 +515,10 @@ class Basis_gauss3d(_Basis_gauss3d):
         res = super().set_basis(time, return_q=return_q, **kwargs)
 
         self.time = time
-        self.vect_time = jnp.eye(time.size)
+        self.vect_time = np.eye(time.size)
 
         self.zero_basis = np.zeros(self.nbasis)
-        self.zero_phys = jnp.zeros(self.nphys)
+        self.zero_phys = np.zeros(self.nphys)
 
         return res
 
@@ -560,9 +560,7 @@ class Basis_gauss3d(_Basis_gauss3d):
                         if fact != 0:
                             Gt_np[i, ind_tmp : ind_tmp + 1] = fact
                 ind_tmp += 1
-        Gt = csr_matrix(Gt_np.T)
-
-        return Gt, None
+        return csc_matrix(Gt_np.T), None
 
     def _ssh2uv(self, ssh):
         """
@@ -583,11 +581,9 @@ class Basis_gauss3d(_Basis_gauss3d):
     def get_Gt_value(self, t):
         idt = np.where(self.time == t)[0]  # Find index
         if idt.size == 1:
-            return self.Gauss_t[:, idt[0]].toarray()[:, 0]
+            return extract_column_from_csc_sparse(self.Gauss_t, idt[0])
         else:
             raise Exception("Several time step selected")
-
-        return self.Gauss_t @ self.vect_time[idt[0]]  # Get corresponding value
 
     def _operg(self, t, X):
         """
@@ -647,10 +643,10 @@ class Basis_gauss3d(_Basis_gauss3d):
         Project to reduced space
         """
 
-        _ensure_adstate_names(self, adState, jnp.zeros(self.shape_phys))
+        _ensure_adstate_names(self, adState, np.zeros(self.shape_phys))
         if self.compute_velocities and (adState[self.name_mod_u] is None or adState[self.name_mod_v] is None):
-            adState[self.name_mod_u] = jnp.zeros_like(self.f_on_u)
-            adState[self.name_mod_v] = jnp.zeros_like(self.f_on_v)
+            adState[self.name_mod_u] = np.zeros_like(self.f_on_u)
+            adState[self.name_mod_v] = np.zeros_like(self.f_on_v)
 
         adparams = _sum_adstate_names(self, adState)
         if self.compute_velocities:
@@ -1281,11 +1277,21 @@ class _Basis_bmaux:
 
         # Auxiliary data
         aux = xr.open_dataset(self.file_aux, decode_times=False)
+        aux = aux[
+            dict(
+                f=get_slice(aux.f.values, ff.min(), ff.max()),
+                # FIXME 10 degrees could be too large
+                lat=get_slice(aux.lat.values, self.lat_min - 10, self.lat_max + 10),
+                # FIXME could similar thing on longitude (or maybe change interpolator ...)
+            )
+        ]
+
         if np.sign(aux["lon"].data.min()) == -1 and self.lon_unit == "0_360":
             aux = aux.assign_coords({"lon": (("lon", aux["lon"].data % 360))})
         elif (np.sign(aux["lon"].data.min()) >= 0 or aux["lon"].data.max() > 180) and self.lon_unit == "-180_180":
             aux = aux.assign_coords({"lon": (("lon", (aux["lon"].data + 180) % 360 - 180))})
-        aux = aux.sortby(aux["lon"])
+        aux = aux.sortby(aux["lon"]).load()
+
         daStd = aux["Std"]
         if "tdec" in daStd.dims:
             _multi_scale = True
@@ -1877,14 +1883,12 @@ class Basis_bmaux(_Basis_bmaux):
             indptr[1:] = np.cumsum(sizes)
 
             Gx.append(csc_matrix((data, indices, indptr), shape=(self.nphys, nwaves)))
-            GxT.append(Gx[-1].T)
+            GxT.append(csc_matrix(Gx[-1].T))
         self.GxT = GxT
         return Gx, Nx
 
     def _compute_component_time(self, time):
-
         Gt = {}  # Time operator that gathers the time factors for each frequency
-
         for iff in range(self.nf):
             nbasis_f = self.iff_wavebounds[iff + 1] - self.iff_wavebounds[iff]
             Gt_np = np.zeros((time.size, nbasis_f))
@@ -1898,8 +1902,7 @@ class Basis_bmaux(_Basis_bmaux):
                             fact /= self.norm_fact[iff][P]
                             Gt_np[i, ind_tmp : ind_tmp + 2 * self.ntheta] = fact
                     ind_tmp += 2 * self.ntheta
-            # Gt[iff] = sparse.csr_fromdense(jnp.array(Gt_np).T)
-            Gt[iff] = csr_matrix(Gt_np.T)
+            Gt[iff] = csc_matrix(Gt_np.T)
 
         return Gt, None
 
@@ -1922,10 +1925,9 @@ class Basis_bmaux(_Basis_bmaux):
     def get_Gt_value(self, t, iff):
         idt = np.where(self.time == t)[0]  # Find index
         if idt.size == 1:
-            return self.Gt[iff][:, idt[0]].toarray()[:, 0]
+            return extract_column_from_csc_sparse(self.Gt[iff], idt[0])
         else:
             raise Exception("Several time step selected")
-            return self.Gt[iff] @ self.vect_time[idt[0]]  # Get corresponding value
 
     def _operg(self, t, X):
         """
@@ -1935,9 +1937,11 @@ class Basis_bmaux(_Basis_bmaux):
         # Initialize phi
         phi = self.zero_phys.ravel()
         for iff in range(self.nf):
-
-            Gt = self.get_Gt_value(t, iff)
             Xf = X[self.iff_wavebounds[iff] : self.iff_wavebounds[iff + 1]]
+            m = Xf == 0
+            if m.all():
+                continue
+            Gt = self.get_Gt_value(t, iff)
             GtXf = Gt * Xf
 
             # # Use shape-safe slicing instead of boolean indexing
@@ -1950,8 +1954,7 @@ class Basis_bmaux(_Basis_bmaux):
             phi += self.Gx[iff] @ reshaped_GtXf.sum(axis=0)
 
         # Reshape phi back to physical space shape
-        phi = phi.reshape(self.shape_phys)
-        return phi
+        return phi.reshape(self.shape_phys)
 
     def _operg_reduced(self, t, phi_2d):
         """Project a 2D physical adjoint field back to reduced space."""
@@ -2001,10 +2004,10 @@ class Basis_bmaux(_Basis_bmaux):
         Project to reduced space
         """
 
-        _ensure_adstate_names(self, adState, jnp.zeros(self.shape_phys))
+        _ensure_adstate_names(self, adState, np.zeros(self.shape_phys))
         if self.compute_velocities and (adState[self.name_mod_u] is None or adState[self.name_mod_v] is None):
-            adState[self.name_mod_u] = jnp.zeros_like(self.f_on_u)
-            adState[self.name_mod_v] = jnp.zeros_like(self.f_on_v)
+            adState[self.name_mod_u] = np.zeros_like(self.f_on_u)
+            adState[self.name_mod_v] = np.zeros_like(self.f_on_v)
 
         adssh = _sum_adstate_names(self, adState)
         if self.compute_velocities:
@@ -2877,3 +2880,14 @@ def test_operg(Basis, t=0):
     ps2 = np.inner(Basis.operg(psi, t).flatten(), phi.flatten())
 
     print(f"test G[{t}]:", ps1 / ps2)
+
+
+def extract_column_from_csc_sparse(G, i):
+    out = np.zeros(G.shape[0], dtype=G.dtype)
+    sl = slice(G.indptr[i], G.indptr[i + 1])
+    out[G.indices[sl]] = G.data[sl]
+    return out
+
+
+def get_slice(x, xmin, xmax):
+    return slice(max(np.where(x >= xmin)[0][0] - 1, 0), np.where(x <= xmax)[0][-1] + 2)

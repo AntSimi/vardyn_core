@@ -759,7 +759,10 @@ class Qgm:
 
         if c0 is not None:
             assert cb is not None
-            c0 = c0.at[:, self.ind0].set(cb[:, self.ind0])
+            if isinstance(c0, np.ndarray):
+                c0[:, self.ind0] = cb[:, self.ind0]
+            else:
+                c0 = c0.at[:, self.ind0].set(cb[:, self.ind0])
 
         if self.mdt is not None:
             h0 += self.mdt
@@ -785,7 +788,7 @@ class Qgm:
                 varb = jnp.append(varb[jnp.newaxis, :, :], cb, axis=0)
 
             helmoltz = jnp.asarray(self.helmoltz_dst)
-            X1, _ = scan(self.one_step_for_scan_jit, init=(h1, ua, va, var1, hb, varb, helmoltz), xs=jnp.zeros(nstep))
+            X1, _ = scan(self.one_step_for_scan_jit, init=(h1, ua, va, var1, hb, varb, helmoltz), length=nstep)
             h1, ua, va, var1, hb, varb, _ = X1
 
         else:
@@ -808,7 +811,7 @@ class Qgm:
                 varb = jnp.append(varb[jnp.newaxis, :, :], cb, axis=0)
 
             helmoltz = jnp.asarray(self.helmoltz_dst)
-            X1, _ = scan(self.one_step_for_scan_jit, init=(h1, ua, va, var1, hb, varb, helmoltz), xs=jnp.zeros(nstep))
+            X1, _ = scan(self.one_step_for_scan_jit, init=(h1, ua, va, var1, hb, varb, helmoltz), length=nstep)
             h1, ua, va, var1, hb, varb, _ = X1
 
         # Mask
@@ -838,9 +841,7 @@ class Qgm:
         return dX1
 
     def step_adj(self, adX0, X0, Xb, nstep=1, c=None):
-
         _, adf = vjp(partial(self.step_jit, Xb=Xb, nstep=nstep, c=c), X0)
-
         return adf(adX0)[0]
 
 
