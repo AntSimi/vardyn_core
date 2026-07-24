@@ -4,6 +4,8 @@ Loads and merges experiment configuration files.
 
 from copy import deepcopy
 
+from .config_default import default as config_def
+
 
 class Config(dict):
 
@@ -76,8 +78,6 @@ def Exp(config_exp):
             configuration module
     """
     # Merge with default config file
-    from .config_default import default as config_def
-
     config = Config({})
 
     # EXP

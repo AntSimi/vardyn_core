@@ -2,18 +2,14 @@
 Coordinates windowed assimilation runs and process orchestration.
 """
 
-import os
-
-# Disable HDF5 file locking BEFORE any xarray/netCDF4 import. On shared
-# filesystems (NFS/Lustre) concurrent reads from sibling subprocesses can
-# raise "NetCDF: Not a valid ID" otherwise.
-os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 from concurrent.futures import ThreadPoolExecutor
 import copy as _copy
 from datetime import timedelta
 from functools import partial
 import glob
+import logging
 import multiprocessing as mp
+import os
 import pickle
 import sys
 import threading
@@ -32,6 +28,8 @@ from shapely.geometry import Polygon
 import xarray as xr
 
 from . import diag, exp, inv, obs as _obs, state, tools as grid
+
+logger = logging.getLogger("vardyn")
 
 
 def prepare_process(
@@ -417,7 +415,7 @@ def prepare_process(
                 tpl_cfg.GRID.dx = dx
                 tpl_cfg.GRID.dy = dy
 
-            _State = state.State(tpl_cfg, verbose=0)
+            _State = state.State(tpl_cfg)
 
             if np.any(_State.lon.max() > config.GRID.lon_max):
                 if ((lat0 + lat1) / 2 < 0 and np.any(_State.lon[-1] > config.GRID.lon_max)) or (
@@ -635,7 +633,7 @@ def prepare_process(
                     pickle.dump(_config, f)
 
             if flag_assim and (flag_assim_restart or not os.path.exists(f"{_config.INV.path_save_control_vectors}/Xres.nc")):
-                worker = partial(inv.Inv_4Dvar, config=_config, State=_State, verbose=0)
+                worker = partial(inv.Inv_4Dvar, config=_config, State=_State)
                 if flag_init_from_previous:
                     list_processes[i].append(worker)
                 else:
@@ -1199,7 +1197,7 @@ def merge_output_date(
             _ds.close()
             del _ds
         except Exception as e:
-            print(f"[merge_output_date] Warning: failed to merge subwindow for date {date}: {e}")
+            logger.warning(f"[merge_output_date]: failed to merge subwindow for date {date}: {e}")
             continue
 
     for name in name_var_save:
@@ -1536,7 +1534,7 @@ def run_assimilation_time_window(
             config0.DIAG.time_min = date_start.strftime("%Y-%m-%d")
             config0.DIAG.time_max = date_end.strftime("%Y-%m-%d")
 
-    State0 = state.State(config0, verbose=0)
+    State0 = state.State(config0)
 
     ############################
     # Merge outputs

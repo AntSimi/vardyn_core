@@ -4,6 +4,7 @@ Implements the model factory and dynamical model classes.
 
 from datetime import timedelta
 from glob import glob
+import logging
 from math import pi
 import os
 import sys
@@ -17,21 +18,22 @@ import pyinterp
 import pyinterp.fill
 import xarray as xr
 
+from . import state
 from .config import USE_FLOAT64
 from .models import REGISTERED_SUBMODEL
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 
-import warnings
+
+from . import tools as grid
+from .exp import Config as Config
+
+logger = logging.getLogger("vardyn")
 
 try:
     import jaxparrow
 except ImportError:
-    warnings.warn("jaxparrow not installed, some jax functions will not be available")
-
-
-from . import tools as grid
-from .exp import Config as Config
+    logger.warning("jaxparrow not installed, some jax functions will not be available")
 
 
 def _fill_nan_nearest(arr):
@@ -84,9 +86,7 @@ class _BcFields:
 
     def __init__(self, config_bc, State=None):
         if State is None:
-            from . import state
-
-            State = state.State(config_bc._config if hasattr(config_bc, "_config") else {}, verbose=False)
+            State = state.State(config_bc._config if hasattr(config_bc, "_config") else {})
 
         self.lon = State.lon
         self.lat = State.lat
@@ -111,7 +111,7 @@ class _BcFields:
                 ds = ds.assign_coords({config_bc.name_lon: ((config_bc.name_lon, (ds[config_bc.name_lon].data + 180) % 360 - 180))})
             ds = ds.sortby(ds[config_bc.name_lon])
         except Exception:
-            print("Warning: can't convert longitude coordinates in " + config_bc.file)
+            logger.warning(f"Can't convert longitude coordinates in {config_bc.file}")
         self.name_time_bc = config_bc.name_time
         has_time = config_bc.name_time is not None and config_bc.name_time in ds
         time_bc = ds[config_bc.name_time].values if has_time else None
@@ -394,7 +394,7 @@ class _BcFields:
         return var_interp
 
 
-def Model(config, State, verbose=True):
+def Model(config, State):
     """
     NAME
         Model
@@ -909,9 +909,6 @@ class Model_qg1l(M):
     def __init__(self, config, State):
 
         super().__init__(config, State)
-
-        os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-
         model = REGISTERED_SUBMODEL.get(self.NAME)
 
         # Coriolis
@@ -1224,7 +1221,7 @@ class Model_qg1l(M):
             try:
                 ug_t, vg_t = jaxparrow.geostrophy(ssh, State0.lat, State0.lon, land_mask=State0.mask)
             except Exception as exc:
-                warnings.warn("jaxparrow geostrophy failed; falling back to Qgm.h2uv: " f"{exc}")
+                logger.warning(f"jaxparrow geostrophy failed; falling back to Qgm.h2uv: {exc}")
                 ug, vg = self.qgm.h2uv(jnp.asarray(ssh))
                 ug_t = np.zeros((State0.ny, State0.nx))
                 vg_t = np.zeros((State0.ny, State0.nx))
@@ -1242,7 +1239,7 @@ class Model_qg1l(M):
                 uc_t = result.ucg if hasattr(result, "ucg") else result[0]
                 vc_t = result.vcg if hasattr(result, "vcg") else result[1]
             except Exception as exc:
-                warnings.warn("jaxparrow cyclogeostrophy failed; skipping " f"cyclogeostrophic velocity diagnostics: {exc}")
+                logger.warning(f"jaxparrow cyclogeostrophy failed; skipping cyclogeostrophic velocity diagnostics: {exc}")
                 uc_t = None
                 vc_t = None
             # Set geostrophic velocities
@@ -1547,11 +1544,7 @@ class Model_csw1l(_ITOpenBoundaryExtensionMixin, M):
     NAME = "MOD_CSW1L"
 
     def __init__(self, config, State):
-
         super().__init__(config, State)
-
-        os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-
         self.config = config
 
         # Model specific libraries
@@ -1606,7 +1599,7 @@ class Model_csw1l(_ITOpenBoundaryExtensionMixin, M):
                 plt.show()
 
         else:
-            print("Warning: No MDT file provided. MDT set to zero. It might affect coupling terms computation.")
+            logger.warning("No MDT file provided. MDT set to zero. It might affect coupling terms computation.")
             self.mdt = np.zeros((State.ny, State.nx))
 
         # Open Rossby Radius if provided
@@ -2182,7 +2175,7 @@ class Model_csw1l(_ITOpenBoundaryExtensionMixin, M):
                     / divisor
                 )
             else:
-                print(f"Warning: {var_key} not found or not defined. Setting to zero.")
+                logger.warning(f"{var_key} not found or not defined. Setting to zero.")
                 return jnp.zeros((State.ny, State.nx))
 
         # Read U11u
@@ -2826,11 +2819,7 @@ class Model_qgsw(M):
     NAME = "MOD_QGSW"
 
     def __init__(self, config, State):
-
         super().__init__(config, State)
-
-        os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-
         # Model specific libraries
         if config.MOD.dir_model is None:
             dir_model = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "models", "model_qgsw"))
@@ -2967,10 +2956,8 @@ class Model_qgsw(M):
             _nbad_mdu = int(np.size(mdu) - np.count_nonzero(np.isfinite(mdu)))
             _nbad_mdv = int(np.size(mdv) - np.count_nonzero(np.isfinite(mdv)))
             if (_nbad_mdt + _nbad_mdu + _nbad_mdv) > 0:
-                print(
-                    "Warning: non-finite MDT background values found "
-                    f"(mdt={_nbad_mdt}, mdu={_nbad_mdu}, mdv={_nbad_mdv}); "
-                    "replacing with 0."
+                logger.warning(
+                    f"Non-finite MDT background values found (mdt={_nbad_mdt}, mdu={_nbad_mdu}, mdv={_nbad_mdv}); replacing with 0."
                 )
             mdt = np.nan_to_num(mdt, nan=0.0, posinf=0.0, neginf=0.0)
             mdu = np.nan_to_num(mdu, nan=0.0, posinf=0.0, neginf=0.0)
@@ -3025,22 +3012,19 @@ class Model_qgsw(M):
                 # that H stays finite and the model can proceed.
                 if config.MOD.cmin is not None:
                     c_fill = config.MOD.cmin
-                    print(
-                        f"WARNING: all Rossby phase velocity values are NaN "
-                        f"after interpolation (tile may lie outside the aux "
+                    logger.warning(
+                        "All Rossby phase velocity values are NaN after interpolation (tile may lie outside the aux "
                         f"file domain). Falling back to cmin={c_fill} m/s."
                     )
                 elif config.MOD.cmax is not None:
                     c_fill = config.MOD.cmax
-                    print(
-                        "WARNING: all Rossby phase velocity values are NaN "
-                        "after interpolation (tile may lie outside the aux "
+                    logger.warning(
+                        "All Rossby phase velocity values are NaN after interpolation (tile may lie outside the aux "
                         f"file domain). Falling back to cmax={c_fill} m/s."
                     )
                 else:
-                    print(
-                        "WARNING: all Rossby phase velocity values are NaN "
-                        "after interpolation and no cmin/cmax fallback is "
+                    logger.warning(
+                        "All Rossby phase velocity values are NaN after interpolation and no cmin/cmax fallback is "
                         "defined. H will be NaN and the model will likely fail."
                     )
             self.c[np.isnan(self.c)] = c_fill
@@ -3360,8 +3344,8 @@ class Model_qgsw(M):
                     "Use external boundary conditions only when using QG-projected sponge targets."
                 )
             if config.MOD.dist_sponge_bc is None or config.MOD.dist_sponge_bc <= 0 or config.MOD.sponge_coef == 0:
-                print(
-                    "Warning: qg_balanced_sponge_bc=True but sponge is inactive "
+                logger.warning(
+                    "Qg_balanced_sponge_bc=True but sponge is inactive "
                     "(dist_sponge_bc=None/≤0 or sponge_coef==0); disabling QG-projected sponge targets."
                 )
             else:
@@ -3388,7 +3372,7 @@ class Model_qgsw(M):
                     self.qg_balanced_sponge_bc = True
                     print("Initialized auxiliary QG projector for balanced sponge targets")
                 except Exception as e:
-                    print(f"Warning: failed to initialize QG projector: {e}; " "falling back to external boundary field sponge targets.")
+                    logger.warning(f"Failed to initialize QG projector: {e}; " "falling back to external boundary field sponge targets.")
                     self.model_proj = None
                     self.qg_balanced_sponge_bc = False
 
@@ -5521,9 +5505,7 @@ class Model_bmit(_ITOpenBoundaryExtensionMixin, M):
             try:
                 bc_fields.append(_BcFields(bc_config, State))
             except Exception as e:
-                import warnings
-
-                warnings.warn(f"Failed to load BM boundary conditions from {bc_config.file}: {e}")
+                logger.warning(f"Failed to load BM boundary conditions from {bc_config.file}: {e}")
         if len(bc_fields) == 1:
             return bc_fields[0]
         if len(bc_fields) > 1:
@@ -5574,11 +5556,7 @@ class Model_bmit(_ITOpenBoundaryExtensionMixin, M):
         return getattr(component_config, "c0", 2.7) * np.ones((State.ny, State.nx))
 
     def __init__(self, config, State):
-
         super().__init__(config, State)
-
-        os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-
         self.config = config
         self.name_var = config.MOD.name_var
         self.bm_config = Config(config.MOD.bm_model)
@@ -5830,8 +5808,7 @@ class Model_bmit(_ITOpenBoundaryExtensionMixin, M):
             _ntheta = int(np.ceil(_L_bdy / _lambda_min))
             print(
                 "  Auto Ntheta (boundary tangential Nyquist): "
-                f"lambda_min={_lambda_min / 1e3:.1f} km, "
-                f"L_bdy={_L_bdy / 1e3:.1f} km -> Ntheta={_ntheta}"
+                f"lambda_min={_lambda_min / 1e3:.1f} km, L_bdy={_L_bdy / 1e3:.1f} km -> Ntheta={_ntheta}"
             )
         if _ntheta > 0:
             theta_p = np.arange(0, pi / 2 + pi / 2 / _ntheta, pi / 2 / _ntheta)
@@ -6597,7 +6574,7 @@ class Model_bmit(_ITOpenBoundaryExtensionMixin, M):
                     / divisor
                 )
             else:
-                print(f"Warning: {var_key} not found or not defined. Setting to zero.")
+                logger.warning(f"{var_key} not found or not defined. Setting to zero.")
                 return jnp.zeros((State.ny, State.nx))
 
         # Read U11

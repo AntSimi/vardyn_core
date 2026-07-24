@@ -19,6 +19,9 @@ import xarray as xr
 
 from .config import USE_FLOAT64
 
+logger = logging.getLogger("vardyn")
+
+
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 
 
@@ -61,7 +64,7 @@ def _clear_adstate_names(obj, adState):
         adState[name] *= 0.0
 
 
-def Basis(config, State, verbose=True, multi_mode=False, *args, **kwargs):
+def Basis(config, State, multi_mode=False, *args, **kwargs):
     """
     NAME
         Basis
@@ -74,11 +77,10 @@ def Basis(config, State, verbose=True, multi_mode=False, *args, **kwargs):
         return
 
     elif config.BASIS.super is None:
-        return Basis_multi(config, State, verbose=verbose)
+        return Basis_multi(config, State)
 
     else:
-        if verbose:
-            print(config.BASIS)
+        logger.debug(config.BASIS)
 
         if config.BASIS.super == "BASIS_GAUSS3D":
             return Basis_gauss3d(config, State, multi_mode=multi_mode)
@@ -1219,7 +1221,7 @@ class _Basis_bmaux:
 
     def set_basis(self, time, return_q=False, **kwargs):
 
-        print("Setting Basis BMaux...")
+        logger.info("Setting Basis BMaux...")
 
         Mutltiple_basis_exp = False
         if Mutltiple_basis_exp:
@@ -1269,8 +1271,8 @@ class _Basis_bmaux:
         theta = np.linspace(0, np.pi, int(np.pi * ff[0] / dff[0] * self.facpsp))[:-1]
         ntheta = len(theta)
         nf = len(ff)
-        logging.info("spatial normalized wavelengths: %s", 1.0 / np.exp(logff))
-        logging.info("ntheta: %s", ntheta)
+        logger.info("spatial normalized wavelengths: %s", 1.0 / np.exp(logff))
+        logger.info("ntheta: %s", ntheta)
 
         # Global time window
         deltat = TIME_MAX - TIME_MIN
@@ -1519,11 +1521,8 @@ class _Basis_bmaux:
 
             iwave += _nwavef
 
-            print(
-                f"lambda={1 / ff_eff[ieff]:.1E}",
-                f"nlocs={NP_eff[ieff]:.1E}",
-                f"tdec={np.mean(tdec[ieff]):.1E}",
-                f"Q={np.mean(Q[self.iff_wavebounds[ieff]:iwave]):.1E}",
+            logger.debug(
+                f"lambda={1 / ff_eff[ieff]:.1E} nlocs={NP_eff[ieff]:.1E} tdec={np.mean(tdec[ieff]):.1E} Q={np.mean(Q[self.iff_wavebounds[ieff]:iwave]):.1E}"
             )
 
         self.iff_wavebounds[-1] = iwave
@@ -1552,12 +1551,14 @@ class _Basis_bmaux:
         self.k = 2 * np.pi * ff_eff
 
         # Compute basis components
-        print("Computing Spatial components")
+        logger.debug("Computing Spatial components")
         self.Gx, self.Nx = self._compute_component_space()  # in space
-        print("Computing Time components")
+        logger.debug("Computing Time components")
         self.Gt, self.Nt = self._compute_component_time(time)  # in time
 
-        print(f"reduced order: {time.size * self.nphys} --> {self.nbasis} => reduced factor: {int(time.size * self.nphys / self.nbasis)}")
+        logger.info(
+            f"reduced order: {time.size * self.nphys} --> {self.nbasis} => reduced factor: {int(time.size * self.nphys / self.nbasis)}"
+        )
         if return_q:
             return Xb, Q
 
@@ -2689,7 +2690,7 @@ class _Basis_offset:
         self.sigma_B = config.BASIS.sigma_B
 
         if self.sigma_B is None:
-            print("Warning, please prescribe sigma_B for Basis Offset")
+            logger.warning("Please prescribe sigma_B for Basis Offset")
 
         self.multi_mode = multi_mode
 
@@ -2772,7 +2773,7 @@ class Basis_offset(_Basis_offset):
 
 class Basis_multi:
 
-    def __init__(self, config, State, verbose=True):
+    def __init__(self, config, State):
 
         self.Basis = []
         _config = config.copy()
@@ -2781,7 +2782,7 @@ class Basis_multi:
         for _BASIS in config.BASIS:
             _config.BASIS = config.BASIS[_BASIS]
 
-            self.Basis.append(Basis(_config, State, verbose=verbose, multi_mode=True))
+            self.Basis.append(Basis(_config, State, multi_mode=True))
             if "name_mod_var" in _config.BASIS and _config.BASIS.name_mod_var is not None:
                 for _name_mod_var in _as_name_list(_config.BASIS.name_mod_var):
                     if _name_mod_var not in self.name_mod_var:

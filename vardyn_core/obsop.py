@@ -3,17 +3,10 @@
 Builds observation operators and interpolation mappings.
 """
 
+import logging
 import os
-import sys
-
-from .config import USE_FLOAT64
-
-# Disable HDF5 file locking BEFORE importing xarray/netCDF4 — spawn worker
-# subprocesses re-import this module and would otherwise hit
-# "NetCDF: Not a valid ID" on shared filesystems when several tiles read
-# the same obs files concurrently.
-os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 import pickle
+import sys
 
 import jax
 from jax import jit
@@ -27,7 +20,9 @@ from scipy.spatial import KDTree
 import xarray as xr
 
 from . import tools as grid
+from .config import USE_FLOAT64
 
+logger = logging.getLogger("vardyn")
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 
 
@@ -48,7 +43,7 @@ def _open_obs_file(path, _retries=4, _sleep=0.5):
     raise last_exc
 
 
-def Obsop(config, State, dict_obs, Model, verbose=1, *args, **kwargs):
+def Obsop(config, State, dict_obs, Model, *args, **kwargs):
     """
     NAME
         basis
@@ -60,8 +55,7 @@ def Obsop(config, State, dict_obs, Model, verbose=1, *args, **kwargs):
     if config.OBSOP is None:
         return
 
-    if verbose:
-        print(config.OBSOP)
+    logger.debug(config.OBSOP)
 
     if config.OBSOP.super is None:
         return Obsop_multi(config, State, dict_obs, Model)
@@ -569,7 +563,7 @@ class Obsop_interp_l4(Obsop_interp):
         #############################
         for i, (date, t) in enumerate(zip(self.date_obs, self.t_obs)):
 
-            print(f"Processing observations at date {date} for variable {self.name_var}...")
+            logger.debug(f"Processing observations at date {date} for variable {self.name_var}...")
 
             sat_info_list = self.dict_obs[date]["attributes"]
             obs_file_list = self.dict_obs[date]["obs_path"]
@@ -636,7 +630,7 @@ class Obsop_interp_l4(Obsop_interp):
 
             if len(var_obs) == 0:
                 # remove date from list
-                print(f"Warning: no observation found at date {date} for variable {self.name_var}, skipping this date.")
+                logger.warning(f"No observation found at date {date} for variable {self.name_var}, skipping this date.")
                 self.date_obs.pop(i)
                 self.t_obs = np.delete(self.t_obs, i)
                 self.t_obs_jax = jnp.delete(self.t_obs_jax, i)
@@ -738,7 +732,7 @@ class Obsop_interp_l4(Obsop_interp):
 
                 if np.all(np.isnan(_var_obs_interp)):
                     # remove date from list
-                    print(f"Warning: all interpolated values are NaN at date {date} for variable {self.name_var}, skipping this date.")
+                    logger.warning(f"All interpolated values are NaN at date {date} for variable {self.name_var}, skipping this date.")
                     print(self.date_obs[i], self.t_obs[i])
                     self.date_obs.pop(i)
                     self.t_obs = np.delete(self.t_obs, i)

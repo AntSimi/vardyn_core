@@ -1,4 +1,7 @@
 """
+SST + SLA  in South Africa
+==========================
+
 Configuration file for running VarDyn-QG on the Agulhas region for the WHIRLS project.
 This configuration file is used to set up the parameters for the experiment, including paths, model settings, observational operators, reduced basis parameters, analysis parameters, observation parameters, and diagnostics.
 This configuration file is only a template and should be modified according to the specific needs of the experiment. In particular, the paths to the data and output directories should be updated to reflect the user's environment
@@ -7,13 +10,18 @@ This configuration file is only a template and should be modified according to t
 from datetime import datetime, timedelta
 import os
 
-os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1"
-
-
+import matplotlib
 import matplotlib.pyplot as plt
 
-from vardyn_core import basis, exp, inv, mod, obs, obsop, state
+from vardyn_core import basis, exp, inv, mod, obs, obsop, start_logger, state
 
+# os.environ["XLA_FLAGS"] = "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1"
+
+
+matplotlib.use("TkAgg")
+start_logger().setLevel("INFO")
+
+# %%
 name_experiment = "VarDyn-QG"  # Short experiment name reused in output paths and files.
 
 myPath = "/home/antoine/Documents/work/vardyn/20260715_test2/"  # Root directory for relative outputs, scratch files, and cached operators.
@@ -22,7 +30,6 @@ compute_obs = True  # Set True to rebuild cached observations and operators.
 vardyn_data = "/home/antoine/Documents/Data/202607_vardyn_data/"
 path_mdt = f"{vardyn_data}/mdt_hybrid_cnes_cls22_cmems2020_global.nc"  # Mean dynamic topography file used by the grid mask and model.
 
-
 name_var_mdt = {"lon": "longitude", "lat": "latitude", "var": "mdt"}  # Coordinate and variable names used to read MDT.
 
 sigma_nadir = 0.05  # Optional fallback nadir SSH error standard deviation, in meters.
@@ -30,7 +37,6 @@ sigma_nadir = 0.05  # Optional fallback nadir SSH error standard deviation, in m
 path_err = ""  # Directory containing per-satellite SSH error files.
 
 name_var_err = {"lon": "lon", "lat": "lat", "var": "noise"}  # Coordinate and variable names for the measurement-error field.
-
 
 NADIR_kw = dict(
     super="OBS_SSH_NADIR",  # Inherit defaults for along-track nadir SSH observations.
@@ -42,7 +48,7 @@ NADIR_kw = dict(
     sigma_noise=sigma_nadir,
 )
 
-
+# %%
 CONFIG = dict(
     #################################################################################################################################
     # Global libraries
@@ -71,10 +77,10 @@ CONFIG = dict(
         super="GRID_GEO",  # Inherit defaults for a regular longitude/latitude grid.
         # lon_min=0, lon_max=50.0,
         # lat_min=-45.0, lat_max=-20.0,
-        lon_min=0,
-        lon_max=50.0,
+        lon_min=5,
+        lon_max=10.0,
         lat_min=-45.0,
-        lat_max=-20,
+        lat_max=-40,
         dlon=0.1,  # Longitude grid spacing, in degrees.
         dlat=0.1,  # Latitude grid spacing, in degrees.
         name_init_mask=path_mdt,  # Here the mask is set using the MDT file. The mask is set to 1 where the MDT is NaN (i.e. Land) and 0 where it is not NaN (i.e. Ocean).
@@ -252,7 +258,7 @@ CONFIG = dict(
         save_minimization=True,  # Save cost-function and gradient history during minimization.
         ftol=5e-5,  # Relative cost-function decrease threshold used for convergence.
         convergence_nit=10,  # Required number of consecutive converged iterations before stopping.
-        maxiter=50,  # Maximum number of minimizer iterations. Here is we set 100 for testing purposes, but in practice, it can be set to a higher value (e.g. 1000).
+        maxiter=3,  # Maximum number of minimizer iterations. Here is we set 100 for testing purposes, but in practice, it can be set to a higher value (e.g. 1000).
         gradient_max_norm=1e12,  # Restart from the best state if the gradient norm exceeds this value.
         max_retries=10,  # Maximum restart attempts after unstable minimizer steps.
         path_save_control_vectors=f"{myPath}/controls/{name_experiment}",  # Directory where control vectors are saved.
@@ -265,9 +271,10 @@ CONFIG = dict(
 os.makedirs(CONFIG["EXP"]["tmp_DA_path"], exist_ok=True)
 
 config = exp.Exp(CONFIG)
+# %%
 State = state.State(config)
-# Model = mod.Model(config,State)
-# dict_obs = obs.Obs(config,State)
-# Obsop = obsop.Obsop(config,State,dict_obs,Model)
-# Basis = basis.Basis(config,State)
+State
+# %%
 inv.Inv(config, State)
+
+# %%

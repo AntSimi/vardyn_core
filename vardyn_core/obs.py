@@ -2,16 +2,12 @@
 Loads, filters, and preprocesses observation datasets.
 """
 
-import os
-import sys
-
-# Disable HDF5 file locking BEFORE importing xarray/netCDF4. On shared
-# filesystems (NFS/Lustre) concurrent reads from sibling subprocesses can
-# raise "NetCDF: Not a valid ID" otherwise.
-os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 import datetime
 import glob
+import logging
+import os
 import re
+import sys
 
 import numpy as np
 from scipy import signal
@@ -20,6 +16,7 @@ import xarray as xr
 from .exp import Config
 from .tools import detrendn, read_auxdata
 
+logger = logging.getLogger("vardyn")
 # Date patterns recognized in obs file names, in order of preference.
 # Each entry is (regex, "fmt") with named groups y, m, d (d optional).
 _FILENAME_DATE_PATTERNS = [
@@ -123,7 +120,7 @@ def _open_obs_dataset(name_obs, OBS, date_start=None, date_end=None):
         try:
             return xr.open_dataset(OBS.path)
         except Exception:
-            print(f"[{name_obs}] Error: unable to open {OBS.path}")
+            logger.error(f"[{name_obs}] Error: unable to open {OBS.path}")
             return None
 
     if "*" in OBS.path:
@@ -133,7 +130,7 @@ def _open_obs_dataset(name_obs, OBS, date_start=None, date_end=None):
 
     files = sorted(glob.glob(path))
     if len(files) == 0:
-        print(f"[{name_obs}] Warning: no files matching {path}")
+        logger.warning(f"[{name_obs}] : no files matching {path}")
         return None
 
     # Filter by filename date pattern (e.g. "20250603" or "202506") so we
@@ -141,10 +138,10 @@ def _open_obs_dataset(name_obs, OBS, date_start=None, date_end=None):
     n_total = len(files)
     files = _filter_files_by_date(files, date_start, date_end)
     if len(files) == 0:
-        print(f"[{name_obs}] Warning: no files in date range " f"[{date_start}, {date_end}] (out of {n_total} candidates)")
+        logger.warning(f"[{name_obs}]: no files in date range [{date_start}, {date_end}] (out of {n_total} candidates)")
         return None
     if len(files) < n_total:
-        print(f"[{name_obs}] Date filter: {len(files)}/{n_total} files kept")
+        logger.info(f"[{name_obs}] Date filter: {len(files)}/{n_total} files kept")
 
     # Get time dim name from first file (cheap)
     try:
@@ -183,7 +180,7 @@ def _open_obs_dataset(name_obs, OBS, date_start=None, date_end=None):
         try:
             return xr.open_mfdataset(files, compat="override", coords="minimal")
         except Exception:
-            print(f"[{name_obs}] Error: unable to open multiple netcdf files")
+            logger.error(f"[{name_obs}] Error: unable to open multiple netcdf files")
             return None
 
 
@@ -357,7 +354,7 @@ def Obs(config, State, obs_datasets=None, *args, **kwargs):
     """
 
     if config.OBS is None:
-        print("None observation has been provided")
+        logger.warning("None observation has been provided")
         return {}
 
     if config.EXP.time_obs_min is not None:
@@ -425,7 +422,7 @@ def Obs(config, State, obs_datasets=None, *args, **kwargs):
 
     for name_obs, OBS in config.OBS.items():
 
-        print(f"\n{name_obs}:\n{OBS}")
+        logger.debug(f"\n{name_obs}:\n{OBS}")
 
         # Reuse pre-opened dataset if provided, otherwise open here
         _close_after = False
@@ -560,7 +557,7 @@ def _obs_alti(ds, dt_list, dict_obs, obs_name, obs_attr, dt_timestep, out_path, 
             try:
                 _ds = ds.where((ds[obs_attr.name_time] < dt2) & (ds[obs_attr.name_time] >= dt1), drop=True)
             except:
-                print(dt_curr, ": Warning: impossible to select data for this time")
+                logger.warning(f"{dt_curr}: impossible to select data for this time")
                 continue
 
         lon = _ds[obs_attr.name_lon].values
@@ -664,7 +661,7 @@ def _obs_alti(ds, dt_list, dict_obs, obs_name, obs_attr, dt_timestep, out_path, 
 
             count += 1
 
-    print(f"--> {count} tracks selected")
+    logger.info(f"--> {count} tracks selected")
 
 
 def _obs_l4(ds, dt_list, dict_obs, obs_name, obs_attr, dt_timestep, out_path, out_name, lon_unit="0_360", bbox=None):
@@ -706,7 +703,7 @@ def _obs_l4(ds, dt_list, dict_obs, obs_name, obs_attr, dt_timestep, out_path, ou
             try:
                 _ds = ds.where(((ds[obs_attr.name_time] < dt2) & (ds[obs_attr.name_time] >= dt1)).compute(), drop=True)
             except:
-                print(dt_curr, ": Warning: impossible to select data for this time")
+                logger.warning(f"{dt_curr}: impossible to select data for this time")
                 continue
 
         if _ds[obs_attr.name_time].size > 0:
@@ -733,7 +730,7 @@ def _obs_l4(ds, dt_list, dict_obs, obs_name, obs_attr, dt_timestep, out_path, ou
                     elif isinstance(obs_attr.offset, (int, float)):
                         varobs[name] = (("y", "x"), varobs[name][1] + obs_attr.offset)
                     else:
-                        print("Warning: offset should be a number or a dictionary with variable names as keys")
+                        logger.warning("Offset should be a number or a dictionary with variable names as keys")
 
             # Save to netcdf
             dsout = xr.Dataset(varobs)
@@ -757,7 +754,7 @@ def _obs_l4(ds, dt_list, dict_obs, obs_name, obs_attr, dt_timestep, out_path, ou
 
             count += 1
 
-    print(f"--> {count} fields selected")
+    logger.info(f"--> {count} fields selected")
 
 
 def _new_dict_obs(dict_obs, new_dir, date_min=None, date_max=None):
@@ -861,7 +858,7 @@ def get_obs(dict_obs, box, time_init, name_var="SSH"):
                 ds = xr.open_dataset(_path_obs).squeeze()
 
                 if name_var not in ds.variables:
-                    print(f"Warning: {name_var} not in {_path_obs}")
+                    logger.warning(f"{name_var} not in {_path_obs}")
                     continue
 
                 lon_obs = ds[_attrs.name_lon] % 360

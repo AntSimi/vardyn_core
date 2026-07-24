@@ -3,6 +3,8 @@ Shallow-water implementation.
 Louis Thiry, Nov 2023 for IFREMER.
 """
 
+import logging
+
 import jax
 from jax import jit, lax
 import jax.numpy as jnp
@@ -15,6 +17,8 @@ from .flux import flux
 from .helmholtz import HelmholtzNeumannSolver
 from .masks import Masks
 from .reconstruction import linear2_centered, linear4_left, linear6_left, smooth_abs, wenoz4_left, wenoz6_left
+
+logger = logging.getLogger("vardyn")
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 
@@ -221,9 +225,7 @@ class SW:
         # correct only for multi-layer models where H represents the true layer depth.
         self.h_wind = param.get("h_wind", None)
         if self.nl == 1 and self.h_wind is None:
-            import warnings
-
-            warnings.warn(
+            logger.warning(
                 "\n[SW model] nl=1 and h_wind is not set.\n"
                 "  The model's equivalent depth H = c²/g ≈ {:.2f} m is used as the\n"
                 "  wind-stress denominator, but the physical mixed-layer depth is\n"
@@ -231,7 +233,7 @@ class SW:
                 "  → Set  param['h_wind'] = <mixed_layer_depth_m>  (e.g. 100.)".format(
                     float(self.H.mean()), max(1.0, 100.0 / max(float(self.H.mean()), 1e-6))
                 ),
-                stacklevel=2,
+                # stacklevel=2,
             )
 
         # Minimum layer thickness to prevent negative h_tot
@@ -1212,10 +1214,6 @@ class SW:
         Passing them here allows time-varying wind forcing.
         wind_strength: 2D array (nx, ny) or scalar multiplier for wind forcing (default None = no scaling).
         """
-
-        import jax
-        from jax import lax
-        import jax.numpy as jnp
 
         # ----------------------------
         # Prepare inputs

@@ -7,7 +7,6 @@ import glob
 import os
 import sys
 
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -15,8 +14,6 @@ import pyinterp
 import xarray as xr
 
 from . import tools as grid
-
-matplotlib.use("TkAgg")
 
 
 class State:
@@ -27,11 +24,10 @@ class State:
         Main class handling the grid initialization, the storage of model variables and the saving of outputs
     """
 
-    def __init__(self, config, first=True, verbose=True):
+    def __repr__(self):
+        return self.config.GRID
 
-        if first and verbose:
-            print(config.GRID)
-
+    def __init__(self, config, first=True):
         self.config = config
 
         # Parameters

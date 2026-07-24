@@ -3,18 +3,22 @@ Runs inversion drivers and assimilation orchestration.
 """
 
 from datetime import timedelta
-import gc
 import glob
+import logging
 import os
 import sys
 import time
 
 import jax
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy.optimize as opt
 import xarray as xr
 
+from . import basis, mod, obs, obsop
 from .config import USE_FLOAT64
+
+logger = logging.getLogger("vardyn")
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 
@@ -29,10 +33,15 @@ class CrazyGradient(Exception):
 
 def _block_until_ready(obj):
     """Wait for pending JAX work before reporting wall-clock timings."""
-    return jax.tree_util.tree_map(
-        lambda x: x.block_until_ready() if hasattr(x, "block_until_ready") else x,
-        obj,
-    )
+    return jax.tree_util.tree_map(lambda x: x.block_until_ready() if hasattr(x, "block_until_ready") else x, obj)
+
+
+def set_env_variable():
+    # Limit number of threads in numpy
+    os.environ["MKL_NUM_THREADS"] = "1"
+    os.environ["NUMEXPR_NUM_THREADS"] = "1"
+    os.environ["OMP_NUM_THREADS"] = "1"
+    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
 
 def Inv(config, State=None, Model=None, dict_obs=None, Obsop=None, Basis=None, *args, **kwargs):
@@ -47,13 +56,11 @@ def Inv(config, State=None, Model=None, dict_obs=None, Obsop=None, Basis=None, *
     if config.INV is None:
         return Inv_forward(config, State=State, Model=Model)
 
-    print(config.INV)
-
+    logger.debug(config.INV)
     if config.INV.super == "INV_4DVAR":
         return Inv_4Dvar(config, State=State, Model=Model, dict_obs=dict_obs, Obsop=Obsop, Basis=Basis)
-
     else:
-        sys.exit(config.INV.super + " not implemented yet")
+        raise Exception(f"{config.INV.super} not implemented yet")
 
 
 def Inv_forward(config, State, Model):
@@ -65,10 +72,6 @@ def Inv_forward(config, State, Model):
         Run a model forward integration
 
     """
-
-    if "JAX" in config.MOD.super:
-        os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-
     present_date = config.EXP.init_date
     nstep = int(config.EXP.saveoutput_time_step.total_seconds() // Model.dt)
 
@@ -83,7 +86,6 @@ def Inv_forward(config, State, Model):
     State.plot(title="Start of forward integration")
 
     while present_date + timedelta(seconds=nstep * Model.dt) <= config.EXP.final_date:
-
         # Propagation
         Model.step(State, nstep, t=t)
 
@@ -97,40 +99,27 @@ def Inv_forward(config, State, Model):
 
     State.plot(title="End of forward integration")
 
-    return
 
-
-def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Basis=None, verbose=True, gpu_device=None):
+def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Basis=None, gpu_device=None):
     """
     Run a 4Dvar analysis
     """
-
-    # if 'JAX' in config.MOD.super:
-    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     if gpu_device is not None:
         os.environ["CUDA_VISIBLE_DEVICES"] = gpu_device
 
     # Module initializations
     if Model is None:
         # initialize Model operator
-        from . import mod
-
-        Model = mod.Model(config, State, verbose=verbose)
+        Model = mod.Model(config, State)
     if dict_obs is None:
         # initialize Obs
-        from . import obs
-
         dict_obs = obs.Obs(config, State)
     if Obsop is None:
         # initialize Obsop
-        from . import obsop
-
-        Obsop = obsop.Obsop(config, State, dict_obs, Model, verbose=verbose)
+        Obsop = obsop.Obsop(config, State, dict_obs, Model)
     if Basis is None:
         # initialize Basis
-        from . import basis
-
-        Basis = basis.Basis(config, State, verbose=verbose)
+        Basis = basis.Basis(config, State)
 
     # Process observations
     print("process observation operators")
@@ -182,7 +171,7 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
 
     # Covariance matrix
     if config.INV.sigma_B is not None:
-        print("Warning: sigma_B is prescribed --> ignore Q of the reduced basis")
+        logger.warning("Sigma_B is prescribed --> ignore Q of the reduced basis")
         # Least squares
         B = Cov(config.INV.sigma_B)
         R = Cov(config.INV.sigma_R)
@@ -215,7 +204,7 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
 
     # Initial Control vector
     if config.INV.path_init_4Dvar is None:
-        Xopt = np.zeros((Xb.size,))
+        Xopt = np.zeros(Xb.size)
     else:
         # Read previous minimum
         print("Read previous minimum:", config.INV.path_init_4Dvar)
@@ -254,26 +243,20 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
                 Xopt = +Xopt
 
     if not ((config.INV.restart_4Dvar or config.INV.path_init_4Dvar is not None) and maxiter == 0):
-        print("\n*** Minimization ***\n")
-        ###################
-        # Minimization    #
-        ###################
-
-        # Main function
-        raw_fun = var.cost_and_grad
+        logger.info("--- Minimization ---")
         first_cost_eval = True
 
-        def fun(XX):
+        def func_minimize(XX):
             nonlocal first_cost_eval
 
             if not first_cost_eval:
-                return raw_fun(XX)
+                return var.cost_and_grad(XX)
 
             first_cost_eval = False
             time0 = time.time()
-            J, G = raw_fun(XX)
+            J, G = var.cost_and_grad(XX)
             _block_until_ready((J, G))
-            print("[cost & grad] first evaluation compile+run time: {:.2f} seconds".format(time.time() - time0))
+            logger.info("[cost & grad] first evaluation compile+run time: {:.2f} seconds".format(time.time() - time0))
             return J, G
 
         # Callback function called at every minimization iterations
@@ -285,17 +268,13 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
 
         # Minimization options
         options = {}
-        if verbose:
-            options["disp"] = True
-        else:
-            options["disp"] = False
         options["maxiter"] = maxiter
 
         if config.INV.ftol is not None:
             options["ftol"] = config.INV.ftol
 
         if config.INV.gtol is not None:
-            _, g0 = fun(Xopt * 0.0)
+            _, g0 = func_minimize(Xopt * 0.0)
             projg0 = np.max(np.abs(g0))
             options["gtol"] = config.INV.gtol * projg0
 
@@ -310,11 +289,11 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
         gradient_max_norm = getattr(config.INV, "gradient_max_norm", None)
 
         # Run minimization
-        import time
 
         class Wrapper:
             def __init__(self):
-                J0, G0 = fun(Xopt)
+                # FIXME needed? return 0 with case vardyn_core_01
+                J0, G0 = func_minimize(Xopt)
                 self.cache = {"cost": J0, "grad": G0}
                 self.J_list = []
                 self.G_list = []
@@ -335,7 +314,7 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
                 self.best_grad_norm = float(np.max(np.abs(G0)))
 
             def __call__(self, x, *args):
-                cost, grad = fun(x)
+                cost, grad = func_minimize(x)
                 ftol = (cost - self.cache["cost"]) / max(cost, self.cache["cost"], 1)
                 mean_grad = np.mean(np.abs(grad))
                 mean_grad_previous = np.mean(np.abs(self.cache["grad"]))
@@ -344,7 +323,7 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
                 self.cache["grad"] = grad
                 time0 = time.time()
                 text = f"computed in {time0 - self.time:.2f} seconds:, x={x.mean():.2E}, J={cost:.2E}, G={mean_grad:.2E}, ftol={abs(ftol):.2E}, gtol={abs(gtol):.2E}"
-                print(f"* iteration {self.it}  {text}")
+                logger.info(f"* iteration {self.it}  {text}")
                 with open(self.filename_out, "a") as f:
                     f.write(f"iteration {self.it}, {text}\n")
                 self.time = time0
@@ -365,7 +344,7 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
                 if gradient_max_norm is not None and (
                     (not np.isfinite(cost)) or (not np.isfinite(grad_norm)) or grad_norm > gradient_max_norm
                 ):
-                    print(f"\nCrazy gradient detected ({cost=}, {grad_norm=}). Will restart from best state.")
+                    logger.error(f"Crazy gradient detected ({cost=}, {grad_norm=}). Will restart from best state.")
                     raise CrazyGradient()
 
                 # Check sustained convergence
@@ -381,7 +360,7 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
                         self.convergence_count = 0
                     self.last_x = np.array(x).copy()
                     if self.convergence_count >= convergence_nit:
-                        print(f"\nConvergence criteria met for {convergence_nit} consecutive iterations. Stopping.")
+                        logger.info(f"Convergence criteria met for {convergence_nit} consecutive iterations. Stopping.")
                         raise ConvergenceReached()
 
                 return cost
@@ -394,23 +373,25 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
         retry = 0
         while True:
             try:
+                logger.info(f"Inversion method {config.INV.opt_method} with following options {options}")
                 res = opt.minimize(wrapper, Xopt, method=config.INV.opt_method, jac=wrapper.jac, options=options, callback=callback)
-                print("\nIs the minimization successful? {}".format(res.success))
-                print("\nFinal cost function value: {}".format(res.fun))
-                print("\nNumber of iterations: {}".format(res.nit))
+                logger.info("Is the minimization successful? {}".format(res.success))
+                logger.info("Final cost function value: {}".format(res.fun))
+                logger.info("Number of iterations: {}".format(res.nit))
                 Xres = res.x
                 break
+            # FIXME end of convergence must be raise without exception
             except ConvergenceReached:
-                print(f"\nNumber of iterations: {wrapper.it - 1}")
+                logger.info(f"Number of iterations: {wrapper.it - 1}")
                 Xres = wrapper.last_x
                 break
             except CrazyGradient:
                 retry += 1
                 if retry > max_retries:
-                    print(f"Maximum retries ({max_retries}) reached. Stopping minimization.")
+                    logger.error(f"Maximum retries ({max_retries}) reached. Stopping minimization.")
                     Xres = wrapper.best_x
                     break
-                print(f"Restarting minimization from best state (retry {retry}/{max_retries})...")
+                logger.warning(f"Restarting minimization from best state (retry {retry}/{max_retries})...")
                 Xopt = wrapper.best_x
                 wrapper = Wrapper()
 
@@ -420,13 +401,13 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
             ds.to_netcdf(os.path.join(path_save_control_vectors, "minimization_trajectory.nc"))
             ds.close()
     else:
-        print("You ask for restart_4Dvar and maxiter==0, so we save directly the trajectory")
+        logger.info("You ask for restart_4Dvar and maxiter==0, so we save directly the trajectory")
         Xres = +Xopt
 
     ########################
     #    Saving trajectory #
     ########################
-    print("\n*** Saving trajectory ***\n")
+    logger.info("--- Saving trajectory ---")
 
     if config.INV.prec:
         Xa = var.Xb + B.sqr(Xres)
@@ -468,8 +449,6 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
             Model.save_output(State0, date, name_var=Model.var_to_save, t=t)
 
     del State, State0, Xa, dict_obs, B, R, Model, Basis, var, Xopt, Xres, checkpoints, time_checkpoints, t_checkpoints
-    gc.collect()
-    print()
 
 
 # =============================================================================
@@ -808,7 +787,7 @@ class Variational:
         # Cost function (float64 for L-BFGS-B line-search stability)
         J = np.float64(0.5 * (Jo + Jb))
         if self.print_time:
-            print(
+            logger.info(
                 "[cost] computation time [seconds]: "
                 + ", ".join(
                     [
@@ -887,7 +866,7 @@ class Variational:
                     )
 
         if self.print_time:
-            print(
+            logger.info(
                 "[grad] computation time [seconds]: "
                 + ", ".join(
                     [
@@ -930,7 +909,6 @@ def plot_grad_test(L):
     plots the result of a gradient test, L is a list containing
     the test results
     """
-    import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots()
     ax.plot(L[0], L[1], "o", "red")

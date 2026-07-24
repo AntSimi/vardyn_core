@@ -12,6 +12,7 @@ import sys
 from IPython.display import Video
 import cmocean
 from joblib import Parallel, delayed
+import matplotlib
 import matplotlib.gridspec as gridspec
 import matplotlib.pylab as plt
 from matplotlib.ticker import ScalarFormatter
@@ -28,8 +29,10 @@ import xrft
 from . import tools as switchvar
 from .tools import read_auxdata
 
+logger = logging.getLogger("vardyn")
 
-def Diag(config, State, verbose=1):
+
+def Diag(config, State):
     """
     NAME
         Diag
@@ -44,8 +47,7 @@ def Diag(config, State, verbose=1):
     elif config.DIAG.super is None:
         return Diag_multi(config, State)
 
-    if verbose:
-        print(config.DIAG)
+    logger.debug(config.DIAG)
 
     if config.DIAG.super == "DIAG_OSSE":
         return Diag_osse(config, State)
@@ -138,8 +140,9 @@ class Diag_osse:
                 {self.name_ref_lon: slice(self.lon_min, self.lon_max), self.name_ref_lat: slice(self.lat_min, self.lat_max)}
             )
         except:
-            print("Warning: unable to select study region in the reference fields.\
-That could be due to non regular grid or bad written netcdf file")
+            logging.warning(
+                "Unable to select study region in the reference fields. That could be due to non regular grid or bad written netcdf file"
+            )
         ref.close()
         self.ref = self.ref.load()
         self.ref_dims = list(self.ref.dims.keys())
@@ -216,7 +219,7 @@ That could be due to non regular grid or bad written netcdf file")
                     }
                 )
             except:
-                print("Warning: unable to select study region in the baseline fields.")
+                logger.warning("Unable to select study region in the baseline fields.")
             bas.close()
             self.bas = self.bas.load()
 
@@ -689,10 +692,7 @@ That could be due to non regular grid or bad written netcdf file")
         return psd
 
     def movie(self, framerate=24, Display=True, clim=None, range_err=None, cmap="Spectral", center=False):
-
         # For memory leak when saving multiple png files...
-        import matplotlib
-
         matplotlib.use("Agg")
 
         # Create merged dataset
@@ -1070,8 +1070,9 @@ class Diag_ose:
                 {self.name_exp_lon: slice(self.lon_min, self.lon_max), self.name_exp_lat: slice(self.lat_min, self.lat_max)}
             )
         except:
-            print("Warning: unable to select study region in the experiment fields.\
-That could be due to non regular grid or bad written netcdf file")
+            logger.warning(
+                "Unable to select study region in the experiment fields. That could be due to non regular grid or bad written netcdf file"
+            )
             self.exp = self.exp.where(
                 (
                     (self.exp.lon >= self.lon_min)
@@ -1134,7 +1135,7 @@ That could be due to non regular grid or bad written netcdf file")
                     {self.name_bas_lon: slice(self.lon_min, self.lon_max), self.name_bas_lat: slice(self.lat_min, self.lat_max)}
                 )
             except:
-                print("Warning: unable to select study region in the baseline fields.")
+                logger.warning("Unable to select study region in the baseline fields.")
             bas.close()
             del bas
 
@@ -1912,10 +1913,7 @@ That could be due to non regular grid or bad written netcdf file")
         return list_lon_segment, list_lat_segment, list_ssh_alongtrack_segment, list_ssh_map_interp_segment, npt
 
     def movie(self, framerate=24, Display=True, clim=None, range_err=None, cmap="Spectral", delete_frames=False):
-
         # For memory leak when saving multiple png files...
-        import matplotlib
-
         matplotlib.use("Agg")
 
         # Experimental data

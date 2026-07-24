@@ -2,12 +2,15 @@
 Implements the JSWM shallow-water model with boundary handling.
 """
 
+import logging
+
 import jax
 from jax import checkpoint as jax_checkpoint, jit
 from jax.lax import scan
 import jax.numpy as jnp
 import numpy as np
 
+logger = logging.getLogger("vardyn")
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 
 
@@ -105,15 +108,13 @@ class CSWm:
                 _ntheta_min = int(np.ceil(_L_bdy / _lambda_min))
                 _ntheta_actual = (len(self.bc_theta) - 1) // 2
                 if _ntheta_actual < _ntheta_min:
-                    import warnings
-
-                    warnings.warn(
+                    logger.warning(
                         f"CSWm: Ntheta={_ntheta_actual} is below the boundary Nyquist minimum "
                         f"Ntheta_min={_ntheta_min} "
                         f"(lambda_min={_lambda_min / 1e3:.1f} km, L_bdy={_L_bdy / 1e3:.1f} km). "
                         f"Aliasing in along-boundary wave angle. "
                         f"Consider increasing Ntheta or setting Ntheta=-1 for auto.",
-                        stacklevel=2,
+                        # stacklevel=2,
                     )
 
         # Sponge BC (attributes set externally by wrapper when used)
