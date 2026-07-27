@@ -4,6 +4,7 @@ Defines the model state container and grid-dependent fields.
 
 from copy import deepcopy
 import glob
+import logging
 import os
 import sys
 
@@ -14,6 +15,8 @@ import pyinterp
 import xarray as xr
 
 from . import tools as grid
+
+logger = logging.getLogger("vardyn")
 
 
 class State:
@@ -335,16 +338,7 @@ class State:
         self.mask += (np.isnan(self.lon) + np.isnan(self.lat)).astype(bool)
 
     def save_output(self, date, name_var=None, grid_type=None):
-
-        filename = os.path.join(
-            self.path_save,
-            f"{self.name_exp_save}"
-            f"_y{date.year}"
-            f"m{str(date.month).zfill(2)}"
-            f"d{str(date.day).zfill(2)}"
-            f"h{str(date.hour).zfill(2)}"
-            f"m{str(date.minute).zfill(2)}.nc",
-        )
+        filename = os.path.join(self.path_save, date.strftime("y%Ym%md%dh%Hm%M.nc"))
 
         coords = {}
         coords[self.name_time] = (
@@ -378,7 +372,7 @@ class State:
         var = {}
         for name in name_var:
 
-            var_to_save = +np.array(self.var[name])
+            var_to_save = np.array(self.var[name])
 
             # Apply Mask
             try:
@@ -437,8 +431,8 @@ class State:
                 dsout.close()
                 del dsout
             except Exception as exc:
-                print(f"WARNING: failed to update existing output {filename}: {exc}")
-                print("WARNING: overwriting output file from scratch")
+                logger.warning(f"Failed to update existing output {filename}: {exc}")
+                logger.warning("Overwriting output file from scratch")
                 try:
                     ds.close()
                 except Exception:
@@ -556,6 +550,7 @@ class State:
                 var_to_return = []
                 for name in name_var:
                     if vect:
+                        # FIXME we apply concatenate at the end only one time
                         var_to_return = np.concatenate((var_to_return, self.var[name].ravel()))
                     else:
                         var_to_return.append(self.var[name])
@@ -572,7 +567,7 @@ class State:
                 else:
                     var_to_return.append(self.var[name])
 
-        return deepcopy(np.asarray(var_to_return))
+        return deepcopy(var_to_return)
 
     def getparams(self, name_params=None, vect=False):
         if name_params is not None:

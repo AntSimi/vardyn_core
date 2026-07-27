@@ -520,7 +520,6 @@ class Basis_gauss3d(_Basis_gauss3d):
         self.vect_time = np.eye(time.size)
 
         self.zero_basis = np.zeros(self.nbasis)
-        self.zero_phys = np.zeros(self.nphys)
 
         return res
 
@@ -591,17 +590,13 @@ class Basis_gauss3d(_Basis_gauss3d):
         """
         Project to physicial space
         """
-        # Initialize phi
-        phi = self.zero_phys.ravel()
-
         # Get Gt value
         Gt = self.get_Gt_value(t)
         GtX = Gt * X
 
         reshaped_GtX = GtX.reshape((-1, self.Nx))
 
-        phi += self.Gauss_xy @ (reshaped_GtX.sum(axis=0))
-        return phi.reshape(self.shape_phys)
+        return (self.Gauss_xy @ (reshaped_GtX.sum(axis=0))).reshape(self.shape_phys)
 
     def _operg_reduced(self, t, phi_2d):
         """Project a 2D physical adjoint field back to reduced space."""
@@ -1809,11 +1804,9 @@ class Basis_bmaux(_Basis_bmaux):
     def set_basis(self, time, return_q=False, **kwargs):
         res = super().set_basis(time, return_q=return_q, **kwargs)
         self.time = time
-        self.vect_time = jnp.eye(time.size)
+        self.vect_time = np.eye(time.size)
 
         self.zero_basis = np.zeros(self.nbasis)
-        self.zero_phys = jnp.zeros(self.nphys)
-
         return res
 
     def _compute_component_space(self):
@@ -1934,9 +1927,8 @@ class Basis_bmaux(_Basis_bmaux):
         """
         Project to physicial space
         """
-
         # Initialize phi
-        phi = self.zero_phys.ravel()
+        phi = np.zeros(self.nphys)
         for iff in range(self.nf):
             Xf = X[self.iff_wavebounds[iff] : self.iff_wavebounds[iff + 1]]
             m = Xf == 0

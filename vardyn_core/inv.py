@@ -207,7 +207,7 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
         Xopt = np.zeros(Xb.size)
     else:
         # Read previous minimum
-        print("Read previous minimum:", config.INV.path_init_4Dvar)
+        logger.info("Read previous minimum:", config.INV.path_init_4Dvar)
         ds = xr.open_dataset(config.INV.path_init_4Dvar)
         Xopt = var.Xb * 0
         Xopt[: ds.res.size] = ds.res.values
