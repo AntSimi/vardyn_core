@@ -287,10 +287,10 @@ class Qgm:
             self.h2pv_jit = jit(self.h2pv)
             self.pv2h_jit = jit(self.pv2h)
             self.rhs_jit = jit(self.rhs)
-            self.adv_jit = jit(self.adv)
-            self.euler_jit = jit(self.euler)
+            # self.adv_jit = jit(self.adv)
+            # self.euler_jit = jit(self.euler)
             self.rk2_jit = jit(self.rk2)
-            self.rk3_jit = jit(self.rk3)
+            # self.rk3_jit = jit(self.rk3)
             self.bc_jit = jit(self.bc)
             self.one_step_jit = jit(self.one_step)
             self.one_step_for_scan_jit = jit(self.one_step_for_scan)
@@ -458,8 +458,8 @@ class Qgm:
         #######################
         # Upwind current
         #######################
-        u_on_T = way * 0.5 * (u[1:-1, 1:-1] + u[1:-1, 2:])
-        v_on_T = way * 0.5 * (v[1:-1, 1:-1] + v[2:, 1:-1])
+        u_on_T = way * 0.5 * (u[2:-2, 2:-2] + u[2:-2, 3:-1])
+        v_on_T = way * 0.5 * (v[2:-2, 2:-2] + v[3:-1, 2:-2])
         up = jnp.where(u_on_T < 0, 0, u_on_T)
         um = jnp.where(u_on_T > 0, 0, u_on_T)
         vp = jnp.where(v_on_T < 0, 0, v_on_T)
@@ -469,7 +469,7 @@ class Qgm:
         if self.advect_pv:
             rhs_q = self.adv(up, vp, um, vm, q0)
         else:
-            rhs_q = jnp.zeros_like(q0, dtype=self.dtype)
+            rhs_q = jnp.zeros_like(up, dtype=self.dtype)
 
         # Bathymetry
         if self.bathymetry_PV_term is not None:
@@ -480,26 +480,26 @@ class Qgm:
 
         # Beta plane
         if self.beta is not None:
-            rhs_q = rhs_q.at[2:-2, 2:-2].set(rhs_q[2:-2, 2:-2] - way * self.beta[1:-1, 2:-2] * (v[2:-2, 2:-2] + v[3:-1, 2:-2]) / 2)
+            rhs_q = rhs_q - way * self.beta[1:-1, 2:-2] * (v[2:-2, 2:-2] + v[3:-1, 2:-2]) / 2
 
         # PV Diffusion
         if self.Kdiffus is not None:
-            rhs_q = rhs_q.at[2:-2, 2:-2].set(
-                rhs_q[2:-2, 2:-2]
+            rhs_q = (
+                rhs_q
                 + self.Kdiffus / (self.dx**2) * (q0[2:-2, 3:-1] + q0[2:-2, 1:-3] - 2 * q0[2:-2, 2:-2])
                 + self.Kdiffus / (self.dy**2) * (q0[3:-1, 2:-2] + q0[1:-3, 2:-2] - 2 * q0[2:-2, 2:-2])
             )
 
         rhs_q = jnp.where(jnp.isnan(rhs_q), 0, rhs_q)
-        rhs_q = rhs_q.at[self.ind12].set(0)
-        rhs_q = rhs_q.at[self.ind0].set(0)
+        rhs_q = rhs_q.at[self.ind12[2:-2, 2:-2]].set(0)
+        rhs_q = rhs_q.at[self.ind0[2:-2, 2:-2]].set(0)
 
         if c0 is not None:
-            incr = incr.at[0].set(rhs_q)
+            incr = incr.at[0, 2:-2, 2:-2].set(rhs_q)
 
             if self.ageo_velocities:
-                ua_on_T = way * 0.5 * (ua[1:-1, 1:-1] + ua[1:-1, 2:])
-                va_on_T = way * 0.5 * (va[1:-1, 1:-1] + va[2:, 1:-1])
+                ua_on_T = way * 0.5 * (ua[2:-2, 2:-2] + ua[2:-2, 3:-1])
+                va_on_T = way * 0.5 * (va[2:-2, 2:-2] + va[3:-1, 2:-2])
                 uap = jnp.where(ua_on_T < 0, 0, ua_on_T)
                 uam = jnp.where(ua_on_T > 0, 0, ua_on_T)
                 vap = jnp.where(va_on_T < 0, 0, va_on_T)
@@ -509,7 +509,7 @@ class Qgm:
                 vp += vap
                 vm += vam
 
-            u_mask = self.ocean_h[1:-1, 1:-1]
+            u_mask = self.ocean_h[2:-2, 2:-2]
             up = up * u_mask
             um = um * u_mask
             vp = vp * u_mask
@@ -518,16 +518,16 @@ class Qgm:
             for i in range(c0.shape[0]):
                 rhs_c = self.adv(up, vp, um, vm, c0[i])
                 if self.Kdiffus_trac is not None:
-                    rhs_c = rhs_c.at[2:-2, 2:-2].set(
-                        rhs_c[2:-2, 2:-2]
+                    rhs_c = (
+                        rhs_c
                         + self.Kdiffus_trac / (self.dx**2) * (c0[i, 2:-2, 3:-1] + c0[i, 2:-2, 1:-3] - 2 * c0[i, 2:-2, 2:-2])
                         + self.Kdiffus_trac / (self.dy**2) * (c0[i, 3:-1, 2:-2] + c0[i, 1:-3, 2:-2] - 2 * c0[i, 2:-2, 2:-2])
                     )
                 rhs_c = jnp.where(jnp.isnan(rhs_c), 0, rhs_c)
-                rhs_c = rhs_c.at[self.ind0].set(0)
-                incr = incr.at[i + 1].set(rhs_c)
+                rhs_c = rhs_c.at[self.ind0[2:-2, 2:-2]].set(0)
+                incr = incr.at[i + 1, 2:-2, 2:-2].set(rhs_c)
         else:
-            incr = rhs_q
+            incr = incr.at[2:-2, 2:-2].set(rhs_q)
 
         return incr
 
@@ -535,16 +535,18 @@ class Qgm:
         """
         3rd-order upwind scheme
         """
+        q0_2_0 = 3 * q0[2:-2, 2:-2]
+        q0_2_1Y = 2 * q0[2:-2, 3:-1]
+        q0_2__1Y = 2 * q0[2:-2, 1:-3]
+        q0_2_1X = 2 * q0[3:-1, 2:-2]
+        q0_2__1X = 2 * q0[1:-3, 2:-2]
 
-        ugradq = jnp.zeros_like(q0, dtype=self.dtype)
-
-        ugradq = ugradq.at[2:-2, 2:-2].set(
-            -up[1:-1, 1:-1] * 1 / (6 * self.dx) * (2 * q0[2:-2, 3:-1] + 3 * q0[2:-2, 2:-2] - 6 * q0[2:-2, 1:-3] + q0[2:-2, :-4])
-            + um[1:-1, 1:-1] * 1 / (6 * self.dx) * (q0[2:-2, 4:] - 6 * q0[2:-2, 3:-1] + 3 * q0[2:-2, 2:-2] + 2 * q0[2:-2, 1:-3])
-            - vp[1:-1, 1:-1] * 1 / (6 * self.dy) * (2 * q0[3:-1, 2:-2] + 3 * q0[2:-2, 2:-2] - 6 * q0[1:-3, 2:-2] + q0[:-4, 2:-2])
-            + vm[1:-1, 1:-1] * 1 / (6 * self.dy) * (q0[4:, 2:-2] - 6 * q0[3:-1, 2:-2] + 3 * q0[2:-2, 2:-2] + 2 * q0[1:-3, 2:-2])
+        ugradq = (
+            -up / (6 * self.dx) * (q0_2_1Y + q0_2_0 - 3 * q0_2__1Y + q0[2:-2, :-4])
+            + um / (6 * self.dx) * (q0_2__1Y + q0_2_0 - 3 * q0_2_1Y + q0[2:-2, 4:])
+            - vp / (6 * self.dy) * (q0_2_1X + q0_2_0 - 3 * q0_2__1X + q0[:-4, 2:-2])
+            + vm / (6 * self.dy) * (q0_2__1X + q0_2_0 - 3 * q0_2_1X + q0[4:, 2:-2])
         )
-
         return ugradq
 
     def euler(self, var0, incr, way):

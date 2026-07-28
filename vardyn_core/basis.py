@@ -1429,7 +1429,7 @@ class _Basis_bmaux:
                 enst_same_dim[ieff][P, : enst[ieff][P].size] = enst[ieff][P]
 
         # Fill the Q diagonal matrix (expected variance for each wavelet)
-        print("Computing Q")
+        logger.info("Computing Q")
 
         iwave = 0
         self.iff_wavebounds = [None] * (nf_eff + 1)
