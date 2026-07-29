@@ -2833,15 +2833,13 @@ class Basis_multi:
                 phi_parts.append(jnp.ravel(_phi))
 
         if State is None:
-            return jnp.concatenate(phi_parts)
+            return np.concatenate(phi_parts)
 
     def operg_transpose(self, t, adState):
         """
         Project to reduced space
         """
-
-        adX_parts = [B.operg_transpose(t, adState=adState) for B in self.Basis]
-        adX = jnp.concatenate(adX_parts)
+        adX = np.concatenate([B.operg_transpose(t, adState=adState) for B in self.Basis])
 
         for name_mod_var in self.name_mod_var:
             adState[name_mod_var] *= 0.0

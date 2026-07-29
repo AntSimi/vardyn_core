@@ -16,42 +16,6 @@ from ...config import USE_FLOAT64
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 
 
-def gaspari_cohn(r, c):
-    """
-    NAME
-        bfn_gaspari_cohn
-
-    DESCRIPTION
-        Gaspari-Cohn function. Inspired from E.Cosmes.
-
-        Args:
-            r : array of value whose the Gaspari-Cohn function will be applied
-            c : Distance above which the return values are zeros
-
-
-        Returns:  smoothed values
-
-    """
-    if type(r) is float or type(r) is int:
-        ra = np.array([r])
-    else:
-        ra = r
-    if c <= 0:
-        return np.zeros_like(ra)
-    else:
-        ra = 2 * np.abs(ra) / c
-        gp = np.zeros_like(ra)
-        i = np.where(ra <= 1.0)[0]
-        gp[i] = -0.25 * ra[i] ** 5 + 0.5 * ra[i] ** 4 + 0.625 * ra[i] ** 3 - 5.0 / 3.0 * ra[i] ** 2 + 1.0
-        i = np.where((ra > 1.0) * (ra <= 2.0))[0]
-        gp[i] = (
-            1.0 / 12.0 * ra[i] ** 5 - 0.5 * ra[i] ** 4 + 0.625 * ra[i] ** 3 + 5.0 / 3.0 * ra[i] ** 2 - 5.0 * ra[i] + 4.0 - 2.0 / 3.0 / ra[i]
-        )
-        if type(r) is float:
-            gp = gp[0]
-    return gp
-
-
 def dynamic_slice_tile(array, y_start, x_start, tile_height, tile_width):
     """
     Dynamically slice a tile from the array.
@@ -220,7 +184,7 @@ class Qgm:
         # Mask array
         ################
         # mask=3 away from the coasts
-        mask = 3 * np.ones((ny, nx), dtype="int64")
+        mask = np.full((ny, nx), 3, dtype="int8")
 
         # mask=1 for borders of the domain
         mask[0, :] = 1
@@ -232,9 +196,7 @@ class Qgm:
         mask[1, 1:-1] = 2
         mask[1:-1, 1] = 2
         mask[-2, 1:-1] = 2
-        mask[-3, 1:-1] = 2
         mask[1:-1, -2] = 2
-        mask[1:-1, -3] = 2
 
         # mask=0 on land
         if SSH is not None:
@@ -259,6 +221,7 @@ class Qgm:
         self.ind1 = mask == 1
         self.ind2 = mask == 2
         self.ind12 = self.ind1 + self.ind2
+        self.ind012 = self.ind0 + self.ind1 + self.ind2
 
         # Diffusion coefficients
         self.Kdiffus = Kdiffus
@@ -295,6 +258,7 @@ class Qgm:
             self.one_step_jit = jit(self.one_step)
             self.one_step_for_scan_jit = jit(self.one_step_for_scan)
             self.step_jit = jit(self.step, static_argnums=2)
+
             self.step_tgl_jit = jit(self.step_tgl, static_argnums=3)
             self.step_adj_jit = jit(self.step_adj, static_argnums=3)
 
@@ -433,7 +397,7 @@ class Qgm:
         return h
 
     def rhs(self, u, v, ua, va, var0, way=1):
-        """increment
+        """increment right hand side
 
         Args:
             u (2D array): Zonal velocity
@@ -484,15 +448,12 @@ class Qgm:
 
         # PV Diffusion
         if self.Kdiffus is not None:
-            rhs_q = (
-                rhs_q
-                + self.Kdiffus / (self.dx**2) * (q0[2:-2, 3:-1] + q0[2:-2, 1:-3] - 2 * q0[2:-2, 2:-2])
-                + self.Kdiffus / (self.dy**2) * (q0[3:-1, 2:-2] + q0[1:-3, 2:-2] - 2 * q0[2:-2, 2:-2])
+            rhs_q += self.Kdiffus * (
+                (q0[2:-2, 3:-1] + q0[2:-2, 1:-3] - 2 * q0[2:-2, 2:-2]) / (self.dx**2)
+                + (q0[3:-1, 2:-2] + q0[1:-3, 2:-2] - 2 * q0[2:-2, 2:-2]) / (self.dy**2)
             )
 
-        rhs_q = jnp.where(jnp.isnan(rhs_q), 0, rhs_q)
-        rhs_q = rhs_q.at[self.ind12[2:-2, 2:-2]].set(0)
-        rhs_q = rhs_q.at[self.ind0[2:-2, 2:-2]].set(0)
+        rhs_q = jnp.where(jnp.logical_or(jnp.isnan(rhs_q), self.ind012[2:-2, 2:-2]), 0, rhs_q)
 
         if c0 is not None:
             incr = incr.at[0, 2:-2, 2:-2].set(rhs_q)
@@ -500,14 +461,10 @@ class Qgm:
             if self.ageo_velocities:
                 ua_on_T = way * 0.5 * (ua[2:-2, 2:-2] + ua[2:-2, 3:-1])
                 va_on_T = way * 0.5 * (va[2:-2, 2:-2] + va[3:-1, 2:-2])
-                uap = jnp.where(ua_on_T < 0, 0, ua_on_T)
-                uam = jnp.where(ua_on_T > 0, 0, ua_on_T)
-                vap = jnp.where(va_on_T < 0, 0, va_on_T)
-                vam = jnp.where(va_on_T > 0, 0, va_on_T)
-                up += uap
-                um += uam
-                vp += vap
-                vm += vam
+                up += jnp.where(ua_on_T < 0, 0, ua_on_T)
+                um += jnp.where(ua_on_T > 0, 0, ua_on_T)
+                vp += jnp.where(va_on_T < 0, 0, va_on_T)
+                vm += jnp.where(va_on_T > 0, 0, va_on_T)
 
             u_mask = self.ocean_h[2:-2, 2:-2]
             up = up * u_mask
@@ -515,16 +472,14 @@ class Qgm:
             vp = vp * u_mask
             vm = vm * u_mask
 
-            for i in range(c0.shape[0]):
-                rhs_c = self.adv(up, vp, um, vm, c0[i])
+            for i, c0_ in enumerate(c0):
+                rhs_c = self.adv(up, vp, um, vm, c0_)
                 if self.Kdiffus_trac is not None:
-                    rhs_c = (
-                        rhs_c
-                        + self.Kdiffus_trac / (self.dx**2) * (c0[i, 2:-2, 3:-1] + c0[i, 2:-2, 1:-3] - 2 * c0[i, 2:-2, 2:-2])
-                        + self.Kdiffus_trac / (self.dy**2) * (c0[i, 3:-1, 2:-2] + c0[i, 1:-3, 2:-2] - 2 * c0[i, 2:-2, 2:-2])
+                    rhs_c += self.Kdiffus_trac * (
+                        (c0_[2:-2, 3:-1] + c0_[2:-2, 1:-3] - 2 * c0_[2:-2, 2:-2]) / self.dx**2
+                        + (c0_[3:-1, 2:-2] + c0_[1:-3, 2:-2] - 2 * c0_[2:-2, 2:-2]) / self.dy**2
                     )
-                rhs_c = jnp.where(jnp.isnan(rhs_c), 0, rhs_c)
-                rhs_c = rhs_c.at[self.ind0[2:-2, 2:-2]].set(0)
+                rhs_c = jnp.where(jnp.logical_or(jnp.isnan(rhs_c), self.ind0[2:-2, 2:-2]), 0, rhs_c)
                 incr = incr.at[i + 1, 2:-2, 2:-2].set(rhs_c)
         else:
             incr = incr.at[2:-2, 2:-2].set(rhs_q)
@@ -574,12 +529,10 @@ class Qgm:
         if len(incr.shape) == 3:
             var12 = jnp.append(q12[jnp.newaxis, :, :], var12[1:], axis=0)
         else:
-            var12 = +q12
+            var12 = q12
         incr12 = self.rhs_jit(u12, v12, ua, va, var12, way=way)
 
-        var1 = var0 + self.dt * incr12
-
-        return var1
+        return var0 + self.dt * incr12
 
     def rk3(self, var0, incr, ua, va, hb, qb, way, helmoltz_dst):
         """
@@ -620,42 +573,33 @@ class Qgm:
             var13 = +q13
         incr13 = self.rhs_jit(u13, v13, ua, va, var13, way=way)
 
-        var_final = var0 + (self.dt / 6) * (incr + 4 * incr12 + incr13)
-
-        return var_final
+        return var0 + (self.dt / 6) * (incr + 4 * incr12 + incr13)
 
     def bc(self, var1, var0, u, v, varb):
         """
         Open Boundary Conditions for tracers, following Mellor (1996)
+        https://www.researchgate.net/publication/242777179_Users_Guide_For_A_Three-Dimensional_Primitive_Equation_Numerical_Ocean_Model
         """
-
         if len(varb.shape) == 3 and varb.shape[0] > 1:
-
-            r1_S = 1 / 2 * self.dt / self.dy * (v[1, 1:-1] + jnp.abs(v[1, 1:-1]))
-            r2_S = 1 / 2 * self.dt / self.dy * (v[1, 1:-1] - jnp.abs(v[1, 1:-1]))
-            r1_N = 1 / 2 * self.dt / self.dy * (v[-1, 1:-1] + jnp.abs(v[-1, 1:-1]))
-            r2_N = 1 / 2 * self.dt / self.dy * (v[-1, 1:-1] - jnp.abs(v[-1, 1:-1]))
-            r1_W = 1 / 2 * self.dt / self.dx * (u[1:-1, 1] + jnp.abs(u[1:-1, 1]))
-            r2_W = 1 / 2 * self.dt / self.dx * (u[1:-1, 1] - jnp.abs(u[1:-1, 1]))
-            r1_E = 1 / 2 * self.dt / self.dx * (u[1:-1, -1] + jnp.abs(u[1:-1, -1]))
-            r2_E = 1 / 2 * self.dt / self.dx * (u[1:-1, -1] - jnp.abs(u[1:-1, -1]))
-
+            if self.bc_trac == "OBC":
+                v_sborder = abs(v[1, 1:-1]) * self.dt / self.dy
+                v_nborder = abs(v[-1, 1:-1]) * self.dt / self.dy
+                v_wborder = abs(u[1:-1, 1]) * self.dt / self.dx
+                v_eborder = abs(u[1:-1, -1]) * self.dt / self.dx
+                m_sborder = v[1, 1:-1] < 0
+                m_nborder = v[-1, 1:-1] < 0
+                m_wborder = u[1:-1, 1] < 0
+                m_eborder = u[1:-1, -1] < 0
             for i in range(1, varb.shape[0]):
                 if self.bc_trac == "OBC":
-                    var1 = var1.at[i, 0, 1:-1].set(
-                        var0[i, 0, 1:-1] - (r1_S * (var0[i, 0, 1:-1] - varb[i, 0, 1:-1]) + r2_S * (var0[i, 1, 1:-1] - var0[i, 0, 1:-1]))
-                    )
-                    var1 = var1.at[i, -1, 1:-1].set(
-                        var0[i, -1, 1:-1]
-                        - (r1_N * (var0[i, -1, 1:-1] - var0[i, -2, 1:-1]) + r2_N * (varb[i, -1, 1:-1] - var0[i, -1, 1:-1]))
-                    )
-                    var1 = var1.at[i, 1:-1, 0].set(
-                        var0[i, 1:-1, 0] - (r1_W * (var0[i, 1:-1, 0] - varb[i, 1:-1, 0]) + r2_W * (var0[i, 1:-1, 1] - var0[i, 1:-1, 0]))
-                    )
-                    var1 = var1.at[i, 1:-1, -1].set(
-                        var0[i, 1:-1, -1]
-                        - (r1_E * (var0[i, 1:-1, -1] - var0[i, 1:-1, -2]) + r2_E * (varb[i, 1:-1, -1] - var0[i, 1:-1, -1]))
-                    )
+                    s0, s1 = var0[i, :2, 1:-1]
+                    var1 = var1.at[i, 0, 1:-1].set(s0 * (1 - v_sborder) + jnp.where(m_sborder, s1, varb[i, 0, 1:-1]) * v_sborder)
+                    n1, n0 = var0[i, -2:, 1:-1]
+                    var1 = var1.at[i, -1, 1:-1].set(n0 * (1 - v_nborder) + jnp.where(m_nborder, varb[i, -1, 1:-1], n1) * v_nborder)
+                    w0, w1 = var0[i, 1:-1, :2].T
+                    var1 = var1.at[i, 1:-1, 0].set(w0 * (1 - v_wborder) + jnp.where(m_wborder, w1, varb[i, 1:-1, 0]) * v_wborder)
+                    e1, e0 = var0[i, 1:-1, -2:].T
+                    var1 = var1.at[i, 1:-1, -1].set(e0 * (1 - v_eborder) + jnp.where(m_eborder, varb[i, 1:-1, -1], e1) * v_eborder)
                 else:
                     var1 = var1.at[i, self.ind12].set(varb[i, self.ind12])
 
@@ -775,13 +719,13 @@ class Qgm:
             q0 = self.h2pv_jit(h0, hb)
             qb = self.h2pv_jit(hb, hb)
 
-            h1 = +h0
-            var1 = +q0
-            varb = +qb
+            h1 = h0
+            var1 = q0
+            varb = qb
             if self.ageo_velocities:
                 assert ua0 is not None and va0 is not None
-                ua = +ua0
-                va = +va0
+                ua = ua0
+                va = va0
             else:
                 ua = jnp.zeros_like(h0)
                 va = jnp.zeros_like(h0)
@@ -798,13 +742,13 @@ class Qgm:
             q0 = self.h2pv_jit(h0, hb, c)
             qb = self.h2pv_jit(hb, hb, c)
 
-            h1 = +h0
-            var1 = +q0
-            varb = +qb
+            h1 = h0
+            var1 = q0
+            varb = qb
             if self.ageo_velocities:
                 assert ua0 is not None and va0 is not None
-                ua = +ua0
-                va = +va0
+                ua = ua0
+                va = va0
             else:
                 ua = jnp.zeros_like(h0)
                 va = jnp.zeros_like(h0)
