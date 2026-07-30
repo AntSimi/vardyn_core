@@ -437,11 +437,8 @@ class Qgm:
 
         # Bathymetry
         if self.bathymetry_PV_term is not None:
-            if self.formulation == "sf":
-                rhs_q += self.adv(up, vp, um, vm, self.f * self.bathymetry_PV_term)
-            else:
-                rhs_q += self.adv(up, vp, um, vm, self.f0 * self.bathymetry_PV_term)
-
+            rhs_q += self.adv(up, vp, um, vm, (self.f if self.formulation == "sf" else self.f0) * self.bathymetry_PV_term)
+    
         # Beta plane
         if self.beta is not None:
             rhs_q = rhs_q - way * self.beta[1:-1, 2:-2] * (v[2:-2, 2:-2] + v[3:-1, 2:-2]) / 2
@@ -495,7 +492,7 @@ class Qgm:
         q0_2__1Y = 2 * q0[2:-2, 1:-3]
         q0_2_1X = 2 * q0[3:-1, 2:-2]
         q0_2__1X = 2 * q0[1:-3, 2:-2]
-
+    
         ugradq = (
             -up / (6 * self.dx) * (q0_2_1Y + q0_2_0 - 3 * q0_2__1Y + q0[2:-2, :-4])
             + um / (6 * self.dx) * (q0_2__1Y + q0_2_0 - 3 * q0_2_1Y + q0[2:-2, 4:])

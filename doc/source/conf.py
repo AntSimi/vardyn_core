@@ -18,6 +18,7 @@ extensions = [
     "sphinx.ext.doctest",
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.viewcode",
     "sphinx_gallery.gen_gallery",
 ]
 
@@ -27,7 +28,12 @@ autoclass_content = "both"
 # Active autosummary
 autosummary_generate = True
 
-templates_path = ['_templates']
+templates_path = ["_templates"]
+
+source_suffix = ".rst"
+
+# The master toctree document.
+master_doc = "index"
 exclude_patterns = []
 
 
@@ -35,9 +41,7 @@ exclude_patterns = []
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-import sphinx_pdj_theme
-html_theme = 'sphinx_pdj_theme'
-html_theme_path = [sphinx_pdj_theme.get_html_theme_path()]
+html_theme = 'furo'
 html_static_path = ['_static']
 
 intersphinx_mapping = {
