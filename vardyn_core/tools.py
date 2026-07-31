@@ -2,11 +2,15 @@
 Provides shared numerical, interpolation, and filtering utilities.
 """
 
+import logging
+
 import numpy as np
 import scipy
 from scipy import interpolate, spatial
 import scipy.linalg as spl
 import xarray as xr
+
+logger = logging.getLogger("vardyn")
 
 
 class GridInterpolator:
@@ -120,6 +124,7 @@ def geo2cart(coords):
 
 
 def interp2d(ds, name_vars, lon_out, lat_out):
+    logger.warning("Must be replace by RegularGridInterpolator")
 
     ds = ds.squeeze()
 

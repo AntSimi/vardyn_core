@@ -46,15 +46,16 @@ def dstI2D(x, norm="ortho"):
     """2D type-I discrete sine transform."""
     return dstI1D(dstI1D(x, norm=norm).T, norm=norm).T
 
+
 def dstI2D(x, norm="ortho"):
     """2D type-I discrete sine transform."""
     nx, ny = x.shape
-    x_ = jnp.zeros((nx+2, ny + 2))
+    x_ = jnp.zeros((nx + 2, ny + 2))
     x_ = x_.at[1:-1, 1:-1].set(x)
     res = jnp.fft.irfft(-1j * x_, axis=-1, norm=norm)
     # CHECK suspicious res[: nx + 2] => but result is okay
-    res = jnp.fft.irfft(-1j * res[: nx + 2, 1 : ny + 1], axis=0,norm=norm)
-    return res[1: nx + 1]
+    res = jnp.fft.irfft(-1j * res[: nx + 2, 1 : ny + 1], axis=0, norm=norm)
+    return res[1 : nx + 1]
 
 
 @jit
