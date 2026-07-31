@@ -9,6 +9,16 @@ import scipy.linalg as spl
 import xarray as xr
 
 
+class GridInterpolator:
+    def __init__(self, da, **kwargs):
+        self.func = interpolate.RegularGridInterpolator([da[i].values for i in da.dims], da.values, **kwargs)
+        self.dims = da.dims
+
+    def __call__(self, **kwargs):
+        coords = np.meshgrid(*[kwargs[i] for i in self.dims])
+        return self.func(np.column_stack([v.ravel() for v in coords]))
+
+
 def gaspari_cohn(r, c=1):
     """
     NAME

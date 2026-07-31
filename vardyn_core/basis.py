@@ -14,10 +14,12 @@ import jax.numpy as jnp
 import numpy as np
 import scipy
 from scipy.integrate import quad
+import scipy.interpolate
 from scipy.sparse import csc_matrix
 import xarray as xr
 
 from .config import USE_FLOAT64
+from .tools import GridInterpolator
 
 logger = logging.getLogger("vardyn")
 
@@ -1383,6 +1385,7 @@ class _Basis_bmaux:
         enst = [None] * nf_eff
         tdec = [None] * nf_eff
         norm_fact = [None] * nf_eff
+        f_Tdec = GridInterpolator(daTdec, bounds_error=False)
         for ieff in range(nf_eff):
             iff_o = ieff // _n_tdec_bins if _multi_scale else ieff
             k_o = ieff % _n_tdec_bins if _multi_scale else 0
@@ -1398,7 +1401,7 @@ class _Basis_bmaux:
                 if _multi_scale:
                     tdec_val = float(_tdec_bins_file[k_o]) * self.factdec
                 else:
-                    tdec_tmp = daTdec.interp(f=ff_eff[ieff], lon=elon, lat=elat).values
+                    tdec_tmp = f_Tdec(f=ff_eff[ieff], lon=elon, lat=elat)
                     tdec_val = float(np.nanmean(tdec_tmp)) if not np.all(np.isnan(tdec_tmp)) else 0.0
                     tdec_val *= self.factdec
                 if tdec_val < self.tdecmin:
@@ -1438,6 +1441,8 @@ class _Basis_bmaux:
         std = []
         facQaux = []
         facQaux = []
+
+        f_Std = GridInterpolator(daStd, bounds_error=False)
         for ieff in range(nf_eff):
             iff_o = ieff // _n_tdec_bins if _multi_scale else ieff
             k_o = ieff % _n_tdec_bins if _multi_scale else 0
@@ -1456,9 +1461,10 @@ class _Basis_bmaux:
                 elat = np.linspace(ENSLAT_eff[ieff][P] - dlat, ENSLAT_eff[ieff][P] + dlat, 10)
 
                 if _multi_scale:
-                    std_tmp_values = daStd.interp(f=float(ff[iff_o]), tdec=float(_tdec_bins_file[k_o]), lon=elon, lat=elat).values
+                    std_tmp_values = f_Std(f=float(ff[iff_o]), tdec=float(_tdec_bins_file[k_o]), lon=elon, lat=elat)
                 else:
-                    std_tmp_values = daStd.interp(f=ff_eff[ieff], lon=elon, lat=elat).values
+                    std_tmp_values = f_Std(f=ff_eff[ieff], lon=elon, lat=elat)
+
                 std_tmp = np.nanmean(std_tmp_values) if not np.all(np.isnan(std_tmp_values)) else 10**-10
                 std[ieff].append(std_tmp)
 
