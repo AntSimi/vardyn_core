@@ -1395,11 +1395,10 @@ class _Basis_bmaux:
                 dlat = DX_eff[ieff] * self.km2deg
                 elon = np.linspace(ENSLON_eff[ieff][P] - dlon, ENSLON_eff[ieff][P] + dlon, 10)
                 elat = np.linspace(ENSLAT_eff[ieff][P] - dlat, ENSLAT_eff[ieff][P] + dlat, 10)
-                elon2, elat2 = np.meshgrid(elon, elat)
                 if _multi_scale:
                     tdec_val = float(_tdec_bins_file[k_o]) * self.factdec
                 else:
-                    tdec_tmp = daTdec.interp(f=ff_eff[ieff], lon=elon2.flatten(), lat=elat2.flatten()).values
+                    tdec_tmp = daTdec.interp(f=ff_eff[ieff], lon=elon, lat=elat).values
                     tdec_val = float(np.nanmean(tdec_tmp)) if not np.all(np.isnan(tdec_tmp)) else 0.0
                     tdec_val *= self.factdec
                 if tdec_val < self.tdecmin:
@@ -1435,8 +1434,6 @@ class _Basis_bmaux:
         self.iff_wavebounds = [None] * (nf_eff + 1)
         Q = np.array([])
         facQ = self.facQ  # Move outside the loop for efficiency
-        facQ_largescale = self.facQ_largescale
-        l_largescale = self.l_largescale
 
         std = []
         facQaux = []
@@ -1457,17 +1454,11 @@ class _Basis_bmaux:
                 # Precompute interpolation grid once
                 elon = np.linspace(ENSLON_eff[ieff][P] - dlon, ENSLON_eff[ieff][P] + dlon, 10)
                 elat = np.linspace(ENSLAT_eff[ieff][P] - dlat, ENSLAT_eff[ieff][P] + dlat, 10)
-                elon2, elat2 = np.meshgrid(elon, elat)
 
                 if _multi_scale:
-                    std_tmp_values = daStd.interp(
-                        f=float(ff[iff_o]),
-                        tdec=float(_tdec_bins_file[k_o]),
-                        lon=elon2.ravel(),
-                        lat=elat2.ravel(),
-                    ).values
+                    std_tmp_values = daStd.interp(f=float(ff[iff_o]), tdec=float(_tdec_bins_file[k_o]), lon=elon, lat=elat).values
                 else:
-                    std_tmp_values = daStd.interp(f=ff_eff[ieff], lon=elon2.ravel(), lat=elat2.ravel()).values
+                    std_tmp_values = daStd.interp(f=ff_eff[ieff], lon=elon, lat=elat).values
                 std_tmp = np.nanmean(std_tmp_values) if not np.all(np.isnan(std_tmp_values)) else 10**-10
                 std[ieff].append(std_tmp)
 
@@ -1475,8 +1466,8 @@ class _Basis_bmaux:
                     facQaux_tmp_values = daFacQ.interp(
                         {
                             self.name_var_facQaux["wavenumber"]: ff_eff[ieff],
-                            self.name_var_facQaux["lon"]: elon2.ravel(),
-                            self.name_var_facQaux["lat"]: elat2.ravel(),
+                            self.name_var_facQaux["lon"]: elon,
+                            self.name_var_facQaux["lat"]: elat,
                         }
                     ).values
                     facQaux_tmp = np.nanmean(facQaux_tmp_values) if not np.all(np.isnan(facQaux_tmp_values)) else 1.0

@@ -21,6 +21,7 @@ import xarray as xr
 from . import state
 from .config import USE_FLOAT64
 from .models import REGISTERED_SUBMODEL
+from .obs import _open_obs_dataset
 
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 
@@ -99,10 +100,7 @@ class _BcFields:
 
         dlon = np.nanmean(self.lon[:, 1:] - self.lon[:, :-1])
         dlat = np.nanmean(self.lat[1:, :] - self.lat[:-1, :])
-        _ds = xr.open_mfdataset(sorted(glob(config_bc.file)), chunks=-1)[list(config_bc.name_var.values())].load()
-        # FIXME Un load suffit ??
-        ds = _ds.copy()
-        _ds.close()
+        ds = _open_obs_dataset("Background field", config_bc)
 
         try:
             if np.sign(ds[config_bc.name_lon].data.min()) == -1 and State.lon_unit == "0_360":
@@ -572,7 +570,7 @@ class M:
                     "BC_Config",
                     (),
                     {
-                        "file": config.MOD.bc_file,
+                        "path": config.MOD.bc_file,
                         "name_lon": config.MOD.bc_name_lon,
                         "name_lat": config.MOD.bc_name_lat,
                         "name_time": config.MOD.bc_name_time,
@@ -594,7 +592,7 @@ class M:
                         "BC_Config",
                         (),
                         {
-                            "file": bc_src.get("file"),
+                            "path": bc_src.get("file"),
                             "name_lon": bc_src.get("name_lon", config.MOD.bc_name_lon),
                             "name_lat": bc_src.get("name_lat", config.MOD.bc_name_lat),
                             "name_time": bc_src.get("name_time", config.MOD.bc_name_time),

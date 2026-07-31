@@ -35,12 +35,26 @@ def dynamic_slice_tile(array, y_start, x_start, tile_height, tile_width):
 
 def dstI1D(x, norm="ortho"):
     """1D type-I discrete sine transform."""
-    return jnp.fft.irfft(-1j * jnp.pad(x, (1, 1)), axis=-1, norm=norm)[1 : x.shape[0] + 1, 1 : x.shape[1] + 1]
+    nx, ny = x.shape
+    x_ = jnp.zeros((nx, ny + 2))
+    x_ = x_.at[:, 1:-1].set(x)
+    res = jnp.fft.irfft(-1j * x_, axis=-1, norm=norm)
+    return res[:, 1 : ny + 1]
 
 
 def dstI2D(x, norm="ortho"):
     """2D type-I discrete sine transform."""
     return dstI1D(dstI1D(x, norm=norm).T, norm=norm).T
+
+def dstI2D(x, norm="ortho"):
+    """2D type-I discrete sine transform."""
+    nx, ny = x.shape
+    x_ = jnp.zeros((nx+2, ny + 2))
+    x_ = x_.at[1:-1, 1:-1].set(x)
+    res = jnp.fft.irfft(-1j * x_, axis=-1, norm=norm)
+    # CHECK suspicious res[: nx + 2] => but result is okay
+    res = jnp.fft.irfft(-1j * res[: nx + 2, 1 : ny + 1], axis=0,norm=norm)
+    return res[1: nx + 1]
 
 
 @jit
@@ -383,11 +397,9 @@ class Qgm:
 
         if self.formulation == "sf":
             phib = (self.g / self.f) * hb
-            phi = jnp.zeros_like(q, dtype=self.dtype)
             inv = inverse_elliptic_dst(qin, helmoltz_dst)
-            phi = phi.at[1:-1, 1:-1].set(inv)
-            phi += phib
-            h = (self.f / self.g) * phi
+            phib = phib.at[1:-1, 1:-1].add(inv)
+            h = (self.f / self.g) * (phib)
         else:
             h = jnp.zeros_like(q, dtype=self.dtype)
             inv = inverse_elliptic_dst(qin, helmoltz_dst)
@@ -438,7 +450,7 @@ class Qgm:
         # Bathymetry
         if self.bathymetry_PV_term is not None:
             rhs_q += self.adv(up, vp, um, vm, (self.f if self.formulation == "sf" else self.f0) * self.bathymetry_PV_term)
-    
+
         # Beta plane
         if self.beta is not None:
             rhs_q = rhs_q - way * self.beta[1:-1, 2:-2] * (v[2:-2, 2:-2] + v[3:-1, 2:-2]) / 2
@@ -492,7 +504,7 @@ class Qgm:
         q0_2__1Y = 2 * q0[2:-2, 1:-3]
         q0_2_1X = 2 * q0[3:-1, 2:-2]
         q0_2__1X = 2 * q0[1:-3, 2:-2]
-    
+
         ugradq = (
             -up / (6 * self.dx) * (q0_2_1Y + q0_2_0 - 3 * q0_2__1Y + q0[2:-2, :-4])
             + um / (6 * self.dx) * (q0_2__1Y + q0_2_0 - 3 * q0_2_1Y + q0[2:-2, 4:])
@@ -661,8 +673,8 @@ class Qgm:
         h1, ua, va, var1, hb, varb, helmoltz_dst = X0
         h1, var1 = self.one_step_jit(h1, ua, va, var1, hb, varb, helmoltz_dst=helmoltz_dst)
         X = (h1, ua, va, var1, hb, varb, helmoltz_dst)
-        # FIXME pourquoi on retourne 2 fois la meme valeurs?
-        return X, X
+        # method need to argument return
+        return X, None
 
     def step(self, X0, Xb, nstep=1, c=None):
         """Propagation
@@ -685,19 +697,19 @@ class Qgm:
         """
         ua0 = va0 = None
         if len(X0.shape) == 3:
-            h0 = +X0[0]
+            h0 = X0[0]
             if self.ageo_velocities:
-                ua0 = +X0[1]
-                va0 = +X0[2]
-                c0 = +X0[3:]
+                ua0 = X0[1]
+                va0 = X0[2]
+                c0 = X0[3:]
             else:
-                c0 = +X0[1:]
-            hb = +Xb[0]
-            cb = +Xb[1:]
+                c0 = X0[1:]
+            hb = Xb[0]
+            cb = Xb[1:]
         else:
-            h0 = +X0
+            h0 = X0
             c0 = None
-            hb = +Xb
+            hb = Xb
             cb = None
 
         if c0 is not None:

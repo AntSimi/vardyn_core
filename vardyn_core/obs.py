@@ -9,6 +9,7 @@ import os
 import re
 import sys
 
+from netCDF4 import Dataset
 import numpy as np
 from scipy import signal
 import xarray as xr
@@ -95,6 +96,51 @@ def _filter_files_by_date(files, date_start, date_end):
 
 
 def _open_obs_dataset(name_obs, OBS, date_start=None, date_end=None):
+    filenames = sorted(glob.glob(OBS.path))
+    if len(filenames) == 0:
+        logger.warning(f"[{name_obs}] : no files matching {OBS.path}")
+        return None
+    nb_file = len(filenames)
+    filenames = _filter_files_by_date(filenames, date_start, date_end)
+    if len(filenames) == 0:
+        logger.warning(f"[{name_obs}]: no files in date range [{date_start}, {date_end}] (out of {nb_file} candidates)")
+        return None
+    if len(filenames) < nb_file:
+        logger.info(f"[{name_obs}] Date filter: {len(filenames)}/{nb_file} files kept")
+
+    fields = []
+    for v in OBS.name_var.values():
+        if isinstance(v, list):
+            fields.extend(v)
+        else:
+            fields.append(v)
+
+    coordinates = (OBS.name_time, OBS.name_lon, OBS.name_lat)
+    coords = {OBS.name_time: list(), OBS.name_lon: list(), OBS.name_lat: list()}
+    data_vars = {k: list() for k in fields}
+    with Dataset(filenames[0]) as h:
+        dims = h[fields[0]].dimensions
+        if len(dims) != 1:
+            coords[OBS.name_lon].append(h[OBS.name_lon][:])
+            coords[OBS.name_lat].append(h[OBS.name_lat][:])
+        time_units = h[OBS.name_time].units
+    for f in filenames:
+        with Dataset(f) as h:
+            if len(dims) != 1:
+                coords[OBS.name_time].append(h[OBS.name_time][:])
+            else:
+                for k in coordinates:
+                    coords[k].append(h[k][:])
+            for k in fields:
+                data_vars[k].append(h[k][:].filled(np.nan))
+    coords = {k: ((OBS.name_time if len(dims) == 1 else k), np.concatenate(v)) for k, v in coords.items()}
+    coords[OBS.name_time] = (*coords[OBS.name_time], dict(units=time_units))
+    data_vars = {k: (dims, np.concatenate(v)) for k, v in data_vars.items()}
+    ds = xr.decode_cf(xr.Dataset(coords=coords, data_vars=data_vars))
+    return ds
+
+
+def _open_obs_dataset_(name_obs, OBS, date_start=None, date_end=None):
     """Open the multi-file dataset for one OBS block.
 
     Tries the fast path first (combine='nested' + parallel=True with preprocess),
@@ -496,8 +542,9 @@ def _obs_alti(ds, dt_list, dict_obs, obs_name, obs_attr, dt_timestep, out_path, 
 
     # Determine longitude conversion to apply (deferred until after bbox selection
     # to avoid materializing global SWOT arrays — e.g. (98M, 69) float64 = 50.9 GiB).
-    lon_min_raw = float(ds[obs_attr.name_lon].min())
-    lon_max_raw = float(ds[obs_attr.name_lon].max())
+    x = ds[obs_attr.name_lon].values
+    lon_min_raw = float(x.min())
+    lon_max_raw = float(x.max())
     if np.sign(lon_min_raw) == -1 and lon_unit == "0_360":
         _lon_convert = "0_360"
     elif (np.sign(lon_min_raw) >= 0 or lon_max_raw > 180) and lon_unit == "-180_180":
