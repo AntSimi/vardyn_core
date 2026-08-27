@@ -16,6 +16,17 @@ from ...config import USE_FLOAT64
 jax.config.update("jax_enable_x64", USE_FLOAT64)
 
 
+def scan_python(f, init, xs=None, length=None):
+    if xs is None:
+        xs = [None] * length
+    carry = init
+    ys = []
+    for x in xs:
+        carry, y = f(carry, x)
+        ys.append(y)
+    return carry, np.stack(ys)
+
+
 def dynamic_slice_tile(array, y_start, x_start, tile_height, tile_width):
     """
     Dynamically slice a tile from the array.

@@ -14,7 +14,7 @@ import pickle
 import sys
 import threading
 
-from astropy.convolution import Gaussian2DKernel
+# from astropy.convolution import Gaussian2DKernel
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from cartopy.feature import ShapelyFeature

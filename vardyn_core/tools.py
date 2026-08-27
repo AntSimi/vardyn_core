@@ -463,3 +463,143 @@ def _masked_edge(var, xac):
             var[:, ind_gap] = np.nan
 
     return var
+
+
+import numba
+
+
+def reduce_indices(nb_wave, indices, n_wave):
+    indices_ = np.empty(indices.size // n_wave, dtype=indices.dtype)
+    i = 0
+    for n in nb_wave:
+        if n == 0:
+            continue
+        indices_[i : i + n] = indices[i * n_wave : i * n_wave + n]
+        i += n
+    return indices_
+
+
+@numba.njit(cache=True)
+def dot_wave_reduce_add(data, indices_reduce, nb_wave_reduce, wave_repetition, v, out):
+    # v est de la taille du nombre de colonne
+    # la sortie est de la taille du nombre de colonne
+    M = nb_wave_reduce.size
+    k = 0
+    i_data = 0
+    for i in range(M):
+        nb_wave_ = nb_wave_reduce[i]
+        i0, i1 = k, k + nb_wave_
+        k += nb_wave_
+        if nb_wave_ == 0:
+            continue
+        indices_reduce_ = indices_reduce[i0:i1]
+        out_ = np.zeros(nb_wave_, dtype=out.dtype)
+        for l in range(wave_repetition):
+            v_ = v[i * wave_repetition + l]
+            if v_ != 0:
+                data_ = data[i_data : i_data + nb_wave_]
+                for j in range(nb_wave_):
+                    out_[j] += data_[j] * v_
+            i_data += nb_wave_
+        for j in range(nb_wave_):
+            out[indices_reduce_[j]] += out_[j]
+
+
+@numba.njit(cache=True)
+def tdot_wave_reduce_add(data, indices_reduce, nb_wave_reduce, wave_repetition, v, out):
+    """Transpose and dot in same operation."""
+    # v est de la taille du nombre de ligne
+    i0 = 0
+    i_data = 0
+    # iteration sur les colonnes
+    for i in range(nb_wave_reduce.size):
+        nb_wave_ = nb_wave_reduce[i]
+        if nb_wave_:
+            # Iteration sur N colonne contenant les meme indices
+            indices_reduce_ = indices_reduce[i0 : i0 + nb_wave_]
+            i_start = i * wave_repetition
+            for l in range(i_start, i_start + wave_repetition):
+                out_ = 0
+                data_ = data[i_data : i_data + nb_wave_]
+                for j in range(nb_wave_):
+                    out_ += v[indices_reduce_[j]] * data_[j]
+                out[l] += out_
+                i_data += nb_wave_
+        i0 += nb_wave_
+
+
+@numba.njit(cache=True)
+def build_indices(ir, wr, wave_repetition, indices):
+    i, j = 0, 0
+    for n in wr:
+        if n == 0:
+            continue
+        for _ in range(wave_repetition):
+            indices[j : j + n] = ir[i : i + n]
+            j += n
+        i += n
+    return indices
+
+
+class csc:
+    __slots__ = ("data", "indices_reduce", "nb_wave_reduce", "shape", "dtype", "wave_repetition")
+
+    def __repr__(self):
+        return f"Sparse matrix {self.shape[0]:_} x {self.shape[1]:_}  with {self.nnz:_} nnz"
+
+    def __sizeof__(self):
+        """Retrun only size of matrix without littles attributes."""
+        return self.data_size + self.index_size
+
+    @staticmethod
+    def reduce_indices(nb_wave, indices, n_wave):
+        if nb_wave is None:
+            return None, None
+        nb_wave = nb_wave[::n_wave].copy()
+        indices_ = reduce_indices(nb_wave, indices, n_wave)
+        return nb_wave, indices_
+
+    def __init__(self, datas, shape, dtype="f4", wave_repetition=1):
+        self.wave_repetition = wave_repetition
+        self.data, indices, nb_wave = datas
+        self.nb_wave_reduce, indices_reduce = self.reduce_indices(nb_wave, indices, self.wave_repetition)
+        self.indices_reduce = indices_reduce.astype(np.min_scalar_type(indices_reduce.max()))
+        self.shape = shape
+        self.dtype = dtype
+        if self.data is not None:
+            if not np.issubdtype(self.data.dtype, dtype):
+                self.data = self.data.astype(dtype)
+
+    @property
+    def nb_wave(self):
+        return self.nb_wave_reduce[:].repeat(self.wave_repetition)
+
+    @property
+    def indices(self):
+        indices_ = np.empty(self.data.size, dtype=self.indices_reduce.dtype)
+        build_indices(self.indices_reduce[:], self.nb_wave_reduce[:], self.wave_repetition, indices_)
+        return indices_
+
+    @property
+    def nnz(self):
+        if self.data is None:
+            return 0
+        return self.data.size
+
+    def tdot_add(self, v, out):
+        """Transpose and dot in same operation."""
+        tdot_wave_reduce_add(self.data[:], self.indices_reduce[:], self.nb_wave_reduce[:], self.wave_repetition, v, out)
+
+    def tdot(self, v):
+        """Transpose and dot in same operation."""
+        out = np.zeros(self.shape[1], dtype=v.dtype)
+        self.tdot_add(v, out)
+        return out
+
+    def dot_add(self, v, out):
+        dot_wave_reduce_add(self.data[:], self.indices_reduce[:], self.nb_wave_reduce[:], self.wave_repetition, v, out)
+
+    def dot(self, v):
+        out = np.zeros(self.shape[0], dtype=v.dtype)
+        self.dot_add(v, out)
+        return out

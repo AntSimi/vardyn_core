@@ -24,10 +24,12 @@ import pyinterp
 import scipy
 from scipy.interpolate import griddata
 import xarray as xr
-import xrft
 
 from . import tools as switchvar
 from .tools import read_auxdata
+
+# import xrft
+
 
 logger = logging.getLogger("vardyn")
 
