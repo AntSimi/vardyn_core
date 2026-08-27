@@ -3,7 +3,6 @@ Implements the model factory and dynamical model classes.
 """
 
 from datetime import timedelta
-from glob import glob
 import logging
 from math import pi
 import os

@@ -26,7 +26,7 @@ default = dict(
         final_date=datetime(2012, 12, 2, 0),  # final date (yyyy,mm,dd,hh)
         assimilation_time_step=timedelta(hours=1),  # assimilation time step (corresponding to observation update timestep)
         saveoutput_time_step=timedelta(hours=1),  # time step at which the states are saved
-        plot_time_step=timedelta(days=1),  #  time step at which the states are plotted (for debugging),
+        plot_time_step=timedelta(days=1),  # time step at which the states are plotted (for debugging),
         time_obs_min=None,
         time_obs_max=None,
         lon_obs_min=None,
@@ -103,14 +103,15 @@ default = dict(
     MOD_QG1L=dict(
         name_class="Qgm",  # Name of the model class in jqgm.py
         formulation="ssh",  # Dynamical formulation: 'ssh' (work in SSH space) or 'sf' (work in streamfunction space)
-        name_var={
-            "SSH": "ssh"
-        },  # Dictionnary of variable name (need to be at least SSH, and optionaly tracer variables SST, SSS etc. and/or ageostrophic velocities U, V)
+        # Dictionnary of variable name (need to be at least SSH, and optionaly tracer variables SST, SSS etc. and/or ageostrophic
+        # velocities U, V)
+        name_var={"SSH": "ssh"},
         name_params=None,  # List of parameters to jointly estimate.  Recognised values: 'c' (effective phase-speed field c_eff(x,y)).
         name_init_var={},  # Only if grid is a GRID_FROM_FILE type. Dictionnary of variable names to initialize from the file
         dir_model=None,  # directory of the model (if other than mapping/models/model_qg1l)
         var_to_save=None,  # List of variable names (among of the values of name_var dictionary) to save
-        save_diagnosed_variables=False,  # Whether to save diagnosed variables (e.g. SSH, geostrophic velocies and cyclogeostrophic velocities) in the output netcdf files
+        # Whether to save diagnosed variables (e.g. SSH, geostrophic velocies and cyclogeostrophic velocities) in the output netcdf files
+        save_diagnosed_variables=False,
         save_params=False,  # Whether to save control parameters (e.g. corrective fluxes) in the output netcdf files
         upwind=3,  # Order of the upwind scheme for PV advection (either 1,2 or 3)
         advect_pv=True,  # Whether or not to advect PV.
@@ -123,7 +124,8 @@ default = dict(
         name_var_c={"lon": "", "lat": "", "var": ""},  # Variable names for the phase velocity auxilliary file
         cmin=None,  # Minimum value of phase velocity to consider
         cmax=None,  # Maximum value of phase velocity to consider
-        file_bathy_aux=None,  # Name of netcdf file for ocean bathymetry field. If prescribed, bathymetry will be taken into account in the model
+        # Name of netcdf file for ocean bathymetry field. If prescribed, bathymetry will be taken into account in the model
+        file_bathy_aux=None,
         name_var_bathy={"lon": "", "lat": "", "var": ""},  # Name of longitude,latitude and variable of bathymetry netcdf file
         bathy_ratio_max=None,  # Maximum value of bathymetry-related PV term
         solver="spectral",  # Solver for Elliptical Equation inversion (either spectral or cg - for Conjugate Gradient)
@@ -133,7 +135,8 @@ default = dict(
         Kdiffus_trac=None,
         bc_trac="OBC",  # Either OBC or fixed
         forcing_tracer_from_bc=False,  # Whether to use BC fields to force tracer advection,
-        sponge_coef=0.0,  # Rayleigh damping coefficient applied to tracers in the sponge zone (dimensionless, per model step). Typical values: 0.01–0.2
+        # Rayleigh damping coefficient applied to tracers in the sponge zone (dimensionless, per model step). Typical values: 0.01–0.2
+        sponge_coef=0.0,
         constant_c=True,
         constant_f=True,
         f0=None,
@@ -160,7 +163,8 @@ default = dict(
         ],  # List of parameters to control (among 'He_mean', 'hbc', 'alpha', 'alpha_He', 'alpha_Uu', , 'alpha_Up', 'alpha_Uz')
         name_init_var={},  # Only if grid is a GRID_FROM_FILE type. Dictionnary of variable names to initialize from the file
         dir_model=None,  # directory of the model (if other than mapping/models/model_sw1l)
-        var_to_save=None,  # List of variable names (among of the values of name_var dictionary) to save. If None, all variables in name_var will be saved
+        # List of variable names (among of the values of name_var dictionary) to save. If None, all variables in name_var will be saved
+        var_to_save=None,
         g=9.81,  # Gravity acceleration (in m/s^2)
         # Time stepping parameters
         dtmodel=300,  # model timestep
@@ -189,7 +193,9 @@ default = dict(
         # BM coupling parameters
         flag_coupling_from_bm=False,  # Whether to compute He corrections from the balanced motion field
         path_vertical_modes=None,  # Path of the vertical modes netcdf file
-        path_interaction_terms=None,  # Path of the interaction terms netcdf file. If None, interaction terms will be computed from the vertical modes (if path_vertical_modes is not None) or from the analytical formula of the modes (if path_vertical_modes is None)
+        # Path of the interaction terms netcdf file. If None, interaction terms will be computed from the vertical modes
+        # (if path_vertical_modes is not None) or from the analytical formula of the modes (if path_vertical_modes is None)
+        path_interaction_terms=None,
         name_var_interaction_terms={
             "lon": "",
             "lat": "",
@@ -203,12 +209,20 @@ default = dict(
         # Sponge-layer boundary relaxation parameters
         periodic_x=False,  # Whether to apply periodic boundary conditions in the zonal direction
         periodic_y=False,  # Whether to apply periodic boundary conditions in the meridional direction
-        flag_bc_sponge=True,  # Whether to apply a sponge boundary condition (i.e. a damping term nudging the solution towards the boundary conditions) close to the borders and coastal areas (if *dist_sponge_bc* is not None)
-        dist_sponge_bc=None,  # Width (in km) of the band where boundary conditions are applied to edges of the domain and to coastal aeras. If None, no sponge boundary condition is applied
-        sponge_coef=0.05,  # Damping coefficient of the sponge boundary condition (in s^-1). Typical values are between 0.01 and 0.1 (e.g. 0.05 means a damping timescale of 20 seconds
+        # Whether to apply a sponge boundary condition (i.e. a damping term nudging the solution towards the boundary conditions) close to
+        # the borders and coastal areas (if *dist_sponge_bc* is not None)
+        flag_bc_sponge=True,
+        # Width (in km) of the band where boundary conditions are applied to edges of the domain and to coastal aeras.
+        # If None, no sponge boundary condition is applied
+        dist_sponge_bc=None,
+        # Damping coefficient of the sponge boundary condition (in s^-1).
+        # Typical values are between 0.01 and 0.1 (e.g. 0.05 means a damping timescale of 20 seconds
+        sponge_coef=0.05,
         use_sponge_on_coast=True,  # Whether to apply sponge near coastal areas (land mask)
-        tangential_sponge_factor=1.0,  # factor [0,1] reducing sponge on tangential velocity at open boundaries (1=isotropic, 0=no tangential damping)
-        mask_sponge_bc=True,  # Whether to set the mask to True in the sponge boundary areas (i.e. to avoid assimilating observations in these areas)
+        # factor [0,1] reducing sponge on tangential velocity at open boundaries (1=isotropic, 0=no tangential damping)
+        tangential_sponge_factor=1.0,
+        # Whether to set the mask to True in the sponge boundary areas (i.e. to avoid assimilating observations in these areas)
+        mask_sponge_bc=True,
         bc_it_method="plane_wave_bdy",  # Wave phase method for the sponge IT boundary conditions.
         # 'plane_wave'     : original method, kept for backward compatibility
         # 'plane_wave_bdy' : k evaluated at the boundary edge (recommended default)
@@ -232,7 +246,8 @@ default = dict(
         name_var={"U": "u", "V": "v", "SSH": "ssh"},
         name_init_var={},
         var_to_save=None,
-        name_params=None,  # ['H', 'hbcx', 'hbcy', 'itg'], # list of parameters to control. H denotes dimensionless equivalent-depth log-control.
+        # ['H', 'hbcx', 'hbcy', 'itg'], # list of parameters to control. H denotes dimensionless equivalent-depth log-control.
+        name_params=None,
         nl=1,  # number of layers in the model (for nl>1, set H and g_prime as lists/arrays)
         dtmodel=1200,  # model timestep
         f0=None,  # Coriolis parameter (in s^-1). If None, f0 will be computed from the grid
@@ -249,7 +264,9 @@ default = dict(
         init_from_bc=True,
         cfl=0.25,
         bottom_drag_coef=0.0,
-        slip_coef=1.0,  # Lateral wall slip coefficient (dimensionless, in [0,1]): 1 = free-slip, 0 = no-slip, in-between = partial slip. Use 1 when use_sponge_on_coast=True so the sponge is the sole near-coast damping mechanism (no double damping).
+        # Lateral wall slip coefficient (dimensionless, in [0,1]): 1 = free-slip, 0 = no-slip, in-between = partial slip. Use 1 when
+        # use_sponge_on_coast=True so the sponge is the sole near-coast damping mechanism (no double damping).
+        slip_coef=1.0,
         taux=0.0,  # wind stress in N/m^2
         tauy=0.0,  # wind stress in N/m^2
         path_mdt=None,  # path of MDT
@@ -271,9 +288,14 @@ default = dict(
         dist_sponge_bc=None,
         use_sponge_on_coast=True,
         sponge_coef=0.0,
-        tangential_sponge_factor=1.0,  # factor [0,1] reducing sponge on tangential velocity at open boundaries (1=isotropic, 0=no tangential damping)
-        mask_sponge_bc=False,  # Whether to set the mask to True in the sponge boundary areas (i.e. to avoid assimilating observations in these areas). Defaults to False for backward compatibility with existing Model_qgsw experiments.
-        qg_balanced_sponge_bc=False,  # (SW mode only) Whether to use a QG-projected, dynamically-balanced sponge target instead of the raw external boundary field. Requires an active sponge (sponge_coef > 0, dist_sponge_bc set). Incompatible with the 'bc' control parameter.
+        # factor [0,1] reducing sponge on tangential velocity at open boundaries (1=isotropic, 0=no tangential damping)
+        tangential_sponge_factor=1.0,
+        # Whether to set the mask to True in the sponge boundary areas (i.e. to avoid assimilating observations in these areas).
+        # Defaults to False for backward compatibility with existing Model_qgsw experiments.
+        mask_sponge_bc=False,
+        # (SW mode only) Whether to use a QG-projected, dynamically-balanced sponge target instead of the raw external boundary field.
+        # Requires an active sponge (sponge_coef > 0, dist_sponge_bc set). Incompatible with the 'bc' control parameter.
+        qg_balanced_sponge_bc=False,
         visc_coef=0.0,  # viscosity coefficient (in m^2/s). Typical values 10–30 m²/s, 50–100 m²/s if unstable
         H_floor=None,  # minimum Total Equivalent Depth for controlled H. If None, use cmin**2/g_prime when cmin is set; otherwise 0.
         H_min=None,  # legacy hard minimum equivalent-depth clamp used only when H is not controlled. None means no clamping
@@ -281,10 +303,16 @@ default = dict(
         diff_coef=0.0,  # diffusivity coefficient for h (in m^2/s). Typical values 20–50 m²/s, 100–200 m²/s if unstable
         diff_coef_trac=0.0,  # diffusivity coefficient for passive tracers (in m^2/s). Typical values 50–200 m²/s
         time_scheme="rk3",  # temporal scheme: 'rk3' (SSP-RK3, default) | 'rk2' (explicit midpoint, matches Qgm) | 'rk2_ssp' (Heun)
-        h_adv_scheme="weno",  # h-continuity scheme: 'weno' (conservative WENO-6, default) | 'linear_upwind3'/'linear_upwind5' (fixed linear conservative fluxes for adjoint tests) | 'rusanov1'/'upwind1' (diffusive conservative option)
-        mom_adv_scheme="weno",  # momentum-advection scheme: 'weno' (WENO-6, default) | 'upwind3' | 'upwind5' (fixed linear vorticity face reconstruction)
-        tracer_adv_scheme="weno",  # tracer-advection scheme: 'weno' (WENO-6, default) | 'linear_upwind3'/'linear_upwind5' | 'rusanov1'/'upwind1'
-        solver="dst_cmm",  # elliptic solver: 'dst_cmm' (DST + capacitance-matrix for irregular boundaries, default) | 'dst' (plain DST, matches inverse_elliptic_dst in Qgm)
+        # h-continuity scheme: 'weno' (conservative WENO-6, default) | 'linear_upwind3'/'linear_upwind5' (fixed linear conservative
+        # fluxes for adjoint tests) | 'rusanov1'/'upwind1' (diffusive conservative option)
+        h_adv_scheme="weno",
+        # momentum-advection scheme: 'weno' (WENO-6, default) | 'upwind3' | 'upwind5' (fixed linear vorticity face reconstruction)
+        mom_adv_scheme="weno",
+        # tracer-advection scheme: 'weno' (WENO-6, default) | 'linear_upwind3'/'linear_upwind5' | 'rusanov1'/'upwind1'
+        tracer_adv_scheme="weno",
+        # elliptic solver: 'dst_cmm' (DST + capacitance-matrix for irregular boundaries, default) | 'dst' (plain DST, matches
+        # inverse_elliptic_dst in Qgm)
+        solver="dst_cmm",
         advect_tracer=None,  # If True/False, override automatic tracer detection from name_var. None = auto.
         path_wind=None,  # path to NetCDF wind file containing u10/v10 (if None, no wind forcing)
         name_var_wind={
@@ -395,7 +423,8 @@ default = dict(
             extend_it_open_boundary_sponge=False,
         ),
         alpha_eps=1e-6,  # safety margin for alpha logit references loaded from background files
-        alpha_background_physical=None,  # If None, auto-detect new physical alpha backgrounds via *_control companions; False reads legacy centered alpha anomalies.
+        # If None, auto-detect new physical alpha backgrounds via *_control companions; False reads legacy centered alpha anomalies.
+        alpha_background_physical=None,
         flag_coupling_from_bm=False,  # Whether to compute He and advective corrections from Balanced Motion
         path_vertical_modes=None,  # Path of the vertical modes netcdf file
         path_interaction_terms=None,  # Path of the interaction terms netcdf file
@@ -430,10 +459,13 @@ default = dict(
         name_time="",  # name of time coordinate
         name_lon="",  # name of longitude coordinate
         name_lat="",  # name of latitude coordinate
-        name_var={
-            "SSH": ""
-        },  # dictionnary of observed variables (keys: only SSH because altimetry; values: name of observed SSH, can be a lost of variables to combine, see *combine_var* parameter below)
-        combine_var=None,  # If not None, dictionnary of variable to combine to get the observed variable (keys: same as name_var; values: list of -1 or +1 to indicate how to combine variables in name_var, e.g. {'SSH':[-1,1]} to compute SSH as the difference between the second and the first variable in name_var['SSH'] list)
+        # dictionnary of observed variables (keys: only SSH because altimetry; values: name of observed SSH, can be a lost of variables
+        # to combine, see *combine_var* parameter below)
+        name_var={"SSH": ""},
+        # If not None, dictionnary of variable to combine to get the observed variable (keys: same as name_var; values: list of -1 or +1
+        # to indicate how to combine variables in name_var, e.g. {'SSH':[-1,1]} to compute SSH as the difference between the second and
+        # the first variable in name_var['SSH'] list)
+        combine_var=None,
         synthetic_noise=None,  # Std of synthetic noise (std in meters) to artificially add to the data
         varmax=1e2,  # Maximal value of observations considered
         sigma_noise=None,  # Value of (constant) measurement error
@@ -443,7 +475,9 @@ default = dict(
         name_var_mdt=None,  # dictionary of MDT coordinates and variable {'lon':<name_lon>, 'lat':<name_lat>, 'var':<name_var>}
         path_err=None,  # path of error file
         name_var_err=None,  # dictionary of error coordinates and variable {'lon':<name_lon>, 'lat':<name_lat>, 'var':<name_var>}
-        nudging_params_ssh=None,  # dictionary of nudging parameters on SSH {'sigma':<float>,'K':<float>,'Tau':<datetime.timedelta>}. Note that 'sigma' parameter is useless now, and will be removed soon,
+        # dictionary of nudging parameters on SSH {'sigma':<float>,'K':<float>,'Tau':<datetime.timedelta>}.
+        # Note that 'sigma' parameter is useless now, and will be removed soon,
+        nudging_params_ssh=None,
         delta_t=None,  # Sampling period of the satellite (in s), used for computing geostrophic current
         velocity=None,  # Velocity of the satellite (in m/s), used for computing geostrophic current
     ),
@@ -464,8 +498,12 @@ default = dict(
         name_var_mdt=None,  # dictionary of MDT coordinates and variable {'lon':<name_lon>, 'lat':<name_lat>, 'var':<name_var>}
         path_err=None,  # path of error file
         name_var_err=None,  # dictionary of error coordinates and variable {'lon':<name_lon>, 'lat':<name_lat>, 'var':<name_var>}
-        nudging_params_ssh=None,  # dictionary of nudging parameters on SSH {'sigma':<float>,'K':<float>,'Tau':<datetime.timedelta>}. Note that *sigma* parameter is useless now, and will be removed soon
-        nudging_params_relvort=None,  # dictionary of nudging parameters on Relative Vorticity {'sigma':<float>,'K':<float>,'Tau':<datetime.timedelta>}. Note that *sigma* parameter is useless now, and will be removed soon
+        # dictionary of nudging parameters on SSH {'sigma':<float>,'K':<float>,'Tau':<datetime.timedelta>}.
+        # Note that *sigma* parameter is useless now, and will be removed soon
+        nudging_params_ssh=None,
+        # dictionary of nudging parameters on Relative Vorticity {'sigma':<float>,'K':<float>,'Tau':<datetime.timedelta>}.
+        # Note that *sigma* parameter is useless now, and will be removed soon
+        nudging_params_relvort=None,
     ),
     #################################################################################################################################
     # OBSERVATIONAL OPERATORS
@@ -559,7 +597,9 @@ default = dict(
         facQ_aux_path=None,
         l_largescale=500,  # factor to be multiplied to the estimated Q
         facQ_largescale=1,  # factor to be multiplied to the estimated Q
-        file_depth=None,  # Name of netcdf file for ocean depth field. If prescribed, wavelet components will be attenuated for small depth considering arguments depth1 & depth2
+        # Name of netcdf file for ocean depth field. If prescribed, wavelet components will be attenuated for small depth considering
+        # arguments depth1 & depth2
+        file_depth=None,
         name_var_depth={"lon": "", "lat": "", "var": ""},  # Name of longitude,latitude and variable of depth netcdf file
         depth1=0.0,
         depth2=30.0,
@@ -572,12 +612,12 @@ default = dict(
     # Internal Tides boundary conditions basis (i.e. a set of basis vectors with values at the open boundaries)
     BASIS_HBC=dict(
         name_params=["hbcx", "hbcy"],  # list of parameters to control (among 'He', 'hbcx', 'hbcy', 'itg')
-        ### COMMON PARAMETER ###
+        # COMMON PARAMETER #
         # facgauss = 3.5,  # factor for gaussian spacing= both space/time
         facns=3.5,  # factor for gaussian spacing in space
         facnlt=2.5,  # factor for gaussian spacing in time
         time_dependant=True,  # True if gaussian basis is time dependant
-        ### - HBC PARAMETER ###
+        # - HBC PARAMETER #
         sigma_B_bc=1e-2,  # Background variance for bc
         D_bc=200,  # Space scale of gaussian decomposition for boundary conditions (in km)
         T_bc=20,  # Time scale of gaussian decomposition for boundary conditions (in days)
@@ -598,7 +638,9 @@ default = dict(
         restart_4Dvar=False,  # To restart the minimization process from the last control vector
         ftol=None,  # The iteration stops when (f^k - f^{k+1})/max{|f^k|,|f^{k+1}|,1} <= ftol.
         gtol=None,  # Gradient norm must be less than gtol*g0 (g0 being the gradient at first iteration) before successful termination.
-        convergence_nit=None,  # Number of consecutive iterations the convergence criteria (ftol/gtol) must be met before stopping. If None, scipy stops as soon as the criteria is met once.
+        # Number of consecutive iterations the convergence criteria (ftol/gtol) must be met before stopping.
+        # If None, scipy stops as soon as the criteria is met once.
+        convergence_nit=None,
         maxiter=10,  # Maximal number of iterations for the minimization process
         gradient_max_norm=1e6,  # If the gradient norm exceeds this, minimization will restart from best state
         max_retries=5,  # Number of times to retry minimization after crazy gradients
