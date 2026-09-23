@@ -10,7 +10,6 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import pyinterp
 import xarray as xr
 
@@ -26,6 +25,23 @@ class State:
     DESCRIPTION
         Main class handling the grid initialization, the storage of model variables and the saving of outputs
     """
+
+    COORDINATES_ATTRS = dict(
+        lon=dict(
+            axis="X",
+            long_name="Longitude",
+            standard_name="longitude",
+            units="degrees_east",
+        ),
+        lat=dict(axis="Y", long_name="Latitude", standard_name="latitude", units="degrees_north"),
+        time=dict(
+            axis="T",
+            calendar="gregorian",
+            long_name="Time",
+            standard_name="time",
+            units="seconds since 1950-01-01 00:00:00",
+        ),
+    )
 
     def __repr__(self):
         return self.config.GRID
@@ -343,7 +359,7 @@ class State:
         coords = {}
         coords[self.name_time] = (
             (self.name_time),
-            [pd.to_datetime(date)],
+            [(np.datetime64(date) - np.datetime64("1950-01-01")) / np.timedelta64(1, "s")],
         )
 
         # Build coordinate sets for h, u, and v grids
@@ -411,8 +427,9 @@ class State:
 
         def _write_fresh():
             ds = xr.Dataset(var, coords=coords)
-            ds.to_netcdf(filename, unlimited_dims={"time": True})
-            ds.close()
+            for k, v in self.COORDINATES_ATTRS.items():
+                ds[k].attrs = v
+            ds.to_netcdf(filename)
             del ds
 
         if os.path.exists(filename):
@@ -427,7 +444,7 @@ class State:
                         dsout = dsout.assign_coords({k: v})
                 for name in var.keys():
                     dsout[name] = (var[name][0], var[name][1])
-                dsout.to_netcdf(filename, unlimited_dims={"time": True})
+                dsout.to_netcdf(filename)
                 dsout.close()
                 del dsout
             except Exception as exc:
@@ -544,7 +561,7 @@ class State:
 
         return other
 
-    def getvar(self, name_var=None, vect=False):
+    def getvar(self, name_var=None, vect=False, copy=True):
         if name_var is not None:
             if type(name_var) in (list, np.ndarray):
                 var_to_return = []
@@ -566,8 +583,7 @@ class State:
                     var_to_return = np.concatenate((var_to_return, self.var[name].ravel()))
                 else:
                     var_to_return.append(self.var[name])
-
-        return deepcopy(var_to_return)
+        return deepcopy(var_to_return) if copy else var_to_return
 
     def getparams(self, name_params=None, vect=False):
         if name_params is not None:

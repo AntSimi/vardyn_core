@@ -19,7 +19,7 @@ from scipy.sparse import csc_matrix
 import xarray as xr
 
 from .config import USE_FLOAT64
-from .tools import GridInterpolator
+from .tools import GridInterpolator, csc
 
 logger = logging.getLogger("vardyn")
 
@@ -38,6 +38,9 @@ def _primary_name(name_mod_var):
 
 
 def _assign_to_state_names(obj, State, value):
+    if not isinstance(value, np.ndarray):
+        logger.warning(f"{type(value)=}")
+        raise Exception()
     for name in _as_name_list(obj.name_mod_var):
         if not obj.multi_mode:
             State[name] = value
@@ -55,9 +58,15 @@ def _sum_adstate_names(obj, adState):
     adparams = None
     for name in _as_name_list(obj.name_mod_var):
         if adparams is None:
-            adparams = +adState[name]
+            adparams = np.array(adState[name])
         else:
-            adparams = adparams + adState[name]
+            adparams = adparams + np.array(adState[name])
+    if not isinstance(adparams, np.ndarray):
+        print(type(adparams))
+        print(type(adState[name]))
+        print(adparams)
+        raise Exception()
+        exit()
     return adparams
 
 
@@ -324,15 +333,14 @@ class _Basis_gauss3d:
                 print(f"Load background from file: {self.path_background}")
                 Xb = ds[self.var_background].values[: len(Xb)]
 
-        print(f"lambda={self.sigma_D:.1E} nlocs={ENSLAT.size:.1E} tdec={self.sigma_T:.1E} ntime={ENST.size:.1E} Q={np.mean(Q):.1E}")
-        print(f"reduced order: {time.size * self.nphys} --> {self.nbasis} => reduced factor: {int(time.size * self.nphys / self.nbasis)}")
+        logger.info(f"lambda={self.sigma_D:.1E} nlocs={ENSLAT.size:.1E} tdec={self.sigma_T:.1E} ntime={ENST.size:.1E} Q={np.mean(Q):.1E}")
+        logger.debug(
+            f"reduced order: {time.size * self.nphys} --> {self.nbasis} => reduced factor: {int(time.size * self.nphys / self.nbasis)}"
+        )
 
         # Compute basis components
-        Gauss_xy = self._compute_component_space()
-        Gauss_t, Nt = self._compute_component_time(time)
-        self.Gauss_xy = Gauss_xy
-        self.Gauss_t = Gauss_t
-        self.Nt = Nt
+        self.Gauss_xy = self._compute_component_space()
+        self.Gauss_t, self.Nt = self._compute_component_time(time)
         self.Nx = ENSLAT.size
 
         if return_q:
@@ -529,8 +537,11 @@ class Basis_gauss3d(_Basis_gauss3d):
         """
         Gaussian functions in space
         """
-
-        Gauss_2d = np.zeros((self.ENSLAT.size, self.lon1d.size))
+        full_size = self.ENSLAT.size * self.lon1d.size
+        data = np.empty(full_size)
+        indices = np.empty(full_size, dtype=int)
+        sizes = np.zeros(full_size, dtype=int)
+        j = 0
         for i, (lat0, lon0) in enumerate(zip(self.ENSLAT, self.ENSLON)):
             dx = (np.mod(self.lon1d - lon0 + 180, 360) - 180) / self.km2deg * np.cos(lat0 * np.pi / 180.0)
             dy = (self.lat1d - lat0) / self.km2deg
@@ -542,9 +553,12 @@ class Basis_gauss3d(_Basis_gauss3d):
                 indphys = indphys[~indmask]
                 dx = dx[~indmask]
                 dy = dy[~indmask]
-            Gauss_2d[i, indphys] = mywindow(dx / self.sigma_D) * mywindow(dy / self.sigma_D)
-        self.Gauss_xy_T = csc_matrix(Gauss_2d)
-        return csc_matrix(Gauss_2d.T)
+            sizes[i] = indphys.size
+            indices[j : j + indphys.size] = indphys
+            data[j : j + indphys.size] = mywindow(dx / self.sigma_D) * mywindow(dy / self.sigma_D)
+            j += indphys.size
+        Gauss_xy = csc((data[:j], indices[:j], sizes[: i + 1]), shape=(self.lon1d.size, self.ENSLAT.size))
+        return Gauss_xy
 
     def _compute_component_time(self, time):
 
@@ -592,19 +606,15 @@ class Basis_gauss3d(_Basis_gauss3d):
         """
         Project to physicial space
         """
-        # Get Gt value
-        Gt = self.get_Gt_value(t)
-        GtX = Gt * X
-
-        reshaped_GtX = GtX.reshape((-1, self.Nx))
-
-        return (self.Gauss_xy @ (reshaped_GtX.sum(axis=0))).reshape(self.shape_phys)
+        GtX = self.get_Gt_value(t) * X
+        reshaped_GtX = GtX.reshape((-1, self.Nx)).sum(axis=0)
+        return self.Gauss_xy.dot(reshaped_GtX).reshape(self.shape_phys)
 
     def _operg_reduced(self, t, phi_2d):
         """Project a 2D physical adjoint field back to reduced space."""
 
         Gt = self.get_Gt_value(t)
-        ad_space = self.Gauss_xy_T @ phi_2d.ravel()
+        ad_space = self.Gauss_xy.tdot(phi_2d.ravel())
         adX = Gt.reshape((-1, self.Nx)) * ad_space[None, :]
 
         return adX.ravel()
@@ -1514,7 +1524,8 @@ class _Basis_bmaux:
             iwave += _nwavef
 
             logger.debug(
-                f"lambda={1 / ff_eff[ieff]:.1E} nlocs={NP_eff[ieff]:.1E} tdec={np.mean(tdec[ieff]):.1E} Q={np.mean(Q[self.iff_wavebounds[ieff]:iwave]):.1E}"
+                f"lambda={1 / ff_eff[ieff]:.1E} nlocs={NP_eff[ieff]:.1E} tdec={np.mean(tdec[ieff]):.1E}"
+                f"Q={np.mean(Q[self.iff_wavebounds[ieff]:iwave]):.1E}"
             )
 
         self.iff_wavebounds[-1] = iwave
@@ -1872,9 +1883,8 @@ class Basis_bmaux(_Basis_bmaux):
 
             indptr = np.zeros((nwaves + 1), dtype=int)
             indptr[1:] = np.cumsum(sizes)
-
-            Gx.append(csc_matrix((data, indices, indptr), shape=(self.nphys, nwaves)))
-            GxT.append(csc_matrix(Gx[-1].T))
+            Gx.append(csc((data, indices, sizes), shape=(self.nphys, nwaves), wave_repetition=2 * self.ntheta))
+            GxT.append(csc_matrix(csc_matrix((data, indices, indptr), shape=(self.nphys, nwaves)).T))
         self.GxT = GxT
         return Gx, Nx
 
@@ -1941,7 +1951,7 @@ class Basis_bmaux(_Basis_bmaux):
             reshaped_GtXf = GtXf.reshape((-1, Nx_val))  # Ensure reshaping works dynamically
 
             # Update phi
-            phi += self.Gx[iff] @ reshaped_GtXf.sum(axis=0)
+            self.Gx[iff].dot_add(reshaped_GtXf.sum(axis=0), phi)
 
         # Reshape phi back to physical space shape
         return phi.reshape(self.shape_phys)
@@ -1956,6 +1966,7 @@ class Basis_bmaux(_Basis_bmaux):
             Gt = self.get_Gt_value(t, iff)
             Nx_val = self.Nx[iff]
             ad_space = self.GxT[iff] @ phi_1d
+            # ad_space = self.Gx[iff].tdot(phi_1d)
             adX_f = Gt.reshape((-1, Nx_val)) * ad_space[None, :]
             adX.append(adX_f.ravel())
 
@@ -2023,7 +2034,7 @@ class Basis_hbc:
     def __init__(self, config, State):
 
         ##################
-        ### - COMMON - ###
+        #   - COMMON -   #
         ##################
 
         # Grid specs
@@ -2053,7 +2064,7 @@ class Basis_hbc:
         self.time_dependant = config.BASIS.time_dependant
 
         ##########################################
-        ### - HEIGHT BOUNDARY CONDITIONS hbc - ###
+        #   - HEIGHT BOUNDARY CONDITIONS hbc -   #
         ##########################################
 
         self.D_bc = config.BASIS.D_bc  # Space scale of gaussian decomposition for hbc (in km)
@@ -2113,7 +2124,7 @@ class Basis_hbc:
         self.shape_params_phys = {}  # Dictionary containing the shapes in the physical space of each of the parameters.
 
         #############################################
-        ### SETTING UP THE REDUCED BASIS ELEMENTS ###
+        #   SETTING UP THE REDUCED BASIS ELEMENTS   #
         #############################################
 
         # - In Time - #
@@ -2136,7 +2147,7 @@ class Basis_hbc:
                 )
 
         ############################################
-        ### REDUCED BASIS INFORMATION ATTRIBUTES ###
+        #   REDUCED BASIS INFORMATION ATTRIBUTES   #
         ############################################
 
         # Dictionary with the number of parameters in reduced space
@@ -2171,7 +2182,7 @@ class Basis_hbc:
         print(f"reduced order: {self.nphystot} --> {self.nbasis}\nreduced factor: {int(self.nphystot / self.nbasis)}")
 
         #########################################
-        ### COMPUTING THE COVARIANCE MATRIX Q ###
+        #   COMPUTING THE COVARIANCE MATRIX Q   #
         #########################################
 
         if return_q:
@@ -2241,12 +2252,13 @@ class Basis_hbc:
 
         Notes:
         ------
-        - This function sets the basis elements for the height boundary conditions hbcx parameter. It computes spatial and temporal Gaussian basis functions based on specificatiions of config file and coordinates.
+        - This function sets the basis elements for the height boundary conditions hbcx parameter. It computes spatial and temporal
+          Gaussian basis functions based on specificatiions of config file and coordinates.
         - It prints the total number of hbcx parameters in the reduced space.
         """
 
         ###############################
-        ###   - SPACE DIMENSION -   ###
+        #     - SPACE DIMENSION -     #
         ###############################
 
         # - SOUTH - #
@@ -2294,7 +2306,7 @@ class Basis_hbc:
         self.GxyT["hbcN"] = sparse.CSR.fromdense(jnp.array(bc_N_gauss))
 
         ####################################
-        ###   - BASIS ELEMENT SHAPES -   ###
+        #     - BASIS ELEMENT SHAPES -     #
         ####################################
 
         # - Shapes of the hbcy parameters in the reduced space.
@@ -2381,12 +2393,13 @@ class Basis_hbc:
 
         Notes:
         ------
-        - This function sets the basis elements for the height boundary conditions hbcx parameter. It computes spatial and temporal Gaussian basis functions based on specificatiions of config file and coordinates.
+        - This function sets the basis elements for the height boundary conditions hbcx parameter. It computes spatial and temporal
+          Gaussian basis functions based on specificatiions of config file and coordinates.
         - It prints the total number of hbcy parameters in the reduced space.
         """
 
         #########################################
-        ###   - COMPUTING SPACE DIMENSION -   ###
+        #     - COMPUTING SPACE DIMENSION -     #
         #########################################
 
         # Ensemble of reduced basis latitudes (common for each boundaries)
@@ -2419,7 +2432,7 @@ class Basis_hbc:
         self.GxyT["hbcW"] = sparse.CSR.fromdense(jnp.array(bc_W_gauss))
 
         ####################################
-        ###   - BASIS ELEMENT SHAPES -   ###
+        #     - BASIS ELEMENT SHAPES -     #
         ####################################
 
         # Shapes of the hbcx parameters in the reduced space.
@@ -2505,7 +2518,8 @@ class Basis_hbc:
         """
         Perform the basis projection operation for a given time and parameter vector.
 
-        This method projects the given parameter vector X from reduced basis onto the model grid, at the provided time t. The results can be stored in the provided State object.
+        This method projects the given parameter vector X from reduced basis onto the model grid, at the provided time t. The results can
+        be stored in the provided State object.
 
         operg : | REDUCED SPACE >>>>>> PHYSICAL SPACE | (Model Grid)
 
@@ -2516,7 +2530,8 @@ class Basis_hbc:
         X : ndarray
             The parameter vector to be projected.
         State : object, optional
-            State object to store the parameters after projection. If not provided, the method returns the projected vector onto physical space.
+            State object to store the parameters after projection. If not provided, the method returns the projected vector onto physical
+            space.
 
         Returns:
         -------
@@ -2526,7 +2541,7 @@ class Basis_hbc:
         """
 
         ##############################
-        ###   - INITIALIZATION -   ###
+        #     - INITIALIZATION -     #
         ##############################
 
         # Time gaussian function
@@ -2537,7 +2552,7 @@ class Basis_hbc:
         phi = jnp.zeros((self.nphys,))
 
         ##########################################
-        ###   - BASIS PROJECTION OPERATION -   ###
+        #     - BASIS PROJECTION OPERATION -     #
         ##########################################
 
         for name in self.slice_params_phys.keys():
@@ -2871,9 +2886,11 @@ def test_operg(Basis, t=0):
 
 
 def extract_column_from_csc_sparse(G, i):
-    out = np.zeros(G.shape[0], dtype=G.dtype)
-    sl = slice(G.indptr[i], G.indptr[i + 1])
-    out[G.indices[sl]] = G.data[sl]
+    data = G.data
+    indptr = G.indptr
+    out = np.zeros(G.shape[0], dtype=data.dtype)
+    sl = slice(indptr[i], indptr[i + 1])
+    out[G.indices[sl]] = data[sl]
     return out
 
 

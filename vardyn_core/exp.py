@@ -3,8 +3,11 @@ Loads and merges experiment configuration files.
 """
 
 from copy import deepcopy
+import logging
 
 from .config_default import default as config_def
+
+logger = logging.getLogger("vardyn")
 
 
 class Config(dict):
@@ -89,6 +92,8 @@ def Exp(config_exp):
             config.EXP[key] = val
     config.EXP = Config(config.EXP)
     config.GRID = merge_configs(config_exp, config_def, "NAME_GRID")
+    logger.info(f"t=[{config.EXP.init_date}:{config.EXP.final_date}]")
+    logger.info(f"lon=[{config.GRID.lon_min}:{config.GRID.lon_max}], lat=[{config.GRID.lat_min}:{config.GRID.lat_max}]")
     config.OBS = merge_configs(config_exp, config_def, "NAME_OBS")
     config.MOD = merge_configs(config_exp, config_def, "NAME_MOD")
     config.OBSOP = merge_configs(config_exp, config_def, "NAME_OBSOP")

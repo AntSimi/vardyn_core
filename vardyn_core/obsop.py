@@ -733,7 +733,7 @@ class Obsop_interp_l4(Obsop_interp):
                 if np.all(np.isnan(_var_obs_interp)):
                     # remove date from list
                     logger.warning(f"All interpolated values are NaN at date {date} for variable {self.name_var}, skipping this date.")
-                    print(self.date_obs[i], self.t_obs[i])
+                    # print(self.date_obs[i], self.t_obs[i])
                     self.date_obs.pop(i)
                     self.t_obs = np.delete(self.t_obs, i)
                     self.t_obs_jax = jnp.delete(self.t_obs_jax, i)
@@ -790,12 +790,9 @@ class Obsop_interp_l4(Obsop_interp):
                 fig.suptitle(date.strftime("%Y-%m-%d %H:%M"))
                 plt.show()
 
-        self.varobs_arr = jnp.array(self.varobs)
-        self.errobs_arr = jnp.array(self.errobs)
-
-        mask = jnp.isnan(self.varobs_arr) | jnp.isnan(self.errobs_arr) | (self.errobs_arr < 1e-7) | (self.varobs_arr > 1e7)
-        self.varobs_arr = jnp.where(mask, 0.0, self.varobs_arr)
-        self.errobs_arr = jnp.where(mask, 1e15, self.errobs_arr)
+        mask = np.isnan(self.varobs) | np.isnan(self.errobs) | (self.errobs < 1e-7) | (self.varobs > 1e7)
+        self.varobs_arr = np.where(mask, 0.0, self.varobs)
+        self.errobs_arr = np.where(mask, 1e15, self.errobs)
 
     def is_obs_time(self, t):
         """Check if t is in observation times."""
@@ -813,15 +810,13 @@ class Obsop_interp_l4(Obsop_interp):
     def _misfit(self, t, X):
 
         # Get data at time t
-        idt = jnp.where(self.t_obs_jax == t, size=1)[0]
-
+        idt = np.where(self.t_obs == t)[0]
         # Compute misfit & errors
         misfit = X - self.varobs_arr[idt]
         inverr = 1 / self.errobs_arr[idt]
 
         res = inverr * misfit
-        res = jnp.where(jnp.isnan(res), 0.0, res)
-
+        res = np.where(np.isnan(res), 0.0, res)
         return res.flatten()
 
     def _misfit_reduced(self, t, grad_obs, X):
@@ -975,7 +970,6 @@ class Obsop_multi:
         self.misfit_indt = {}
 
     def is_obs_time(self, t):
-
         for _Obsop in self.Obsop:
             if _Obsop.is_obs_time(t):
                 return True

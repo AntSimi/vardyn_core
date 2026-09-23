@@ -525,7 +525,7 @@ def tdot_wave_reduce_add(data, indices_reduce, nb_wave_reduce, wave_repetition, 
                     out_ += v[indices_reduce_[j]] * data_[j]
                 out[l] += out_
                 i_data += nb_wave_
-        i0 += nb_wave_
+            i0 += nb_wave_
 
 
 @numba.njit(cache=True)
@@ -545,7 +545,7 @@ class csc:
     __slots__ = ("data", "indices_reduce", "nb_wave_reduce", "shape", "dtype", "wave_repetition")
 
     def __repr__(self):
-        return f"Sparse matrix {self.shape[0]:_} x {self.shape[1]:_}  with {self.nnz:_} nnz"
+        return f"Sparse matrix {self.shape[0]:_} x {self.shape[1]:_}  with {self.nnz:_} nnz loaded {self.nnz/(self.shape[0] * self.shape[1]) * 100:.2f}%"
 
     def __sizeof__(self):
         """Retrun only size of matrix without littles attributes."""
@@ -603,3 +603,32 @@ class csc:
         out = np.zeros(self.shape[0], dtype=v.dtype)
         self.dot_add(v, out)
         return out
+
+    def transpose(self):
+        return self.__class__(
+            transpose_sparse_matrix(self.data, self.indices, self.nb_wave), (self.shape[1], self.shape[0]), dtype=self.dtype
+        )
+
+
+@numba.njit(cache=True)
+def transpose_sparse_matrix(data, indices, nb_by_column):
+    nb = data.shape[0]
+    new_data = np.empty(nb, dtype=data.dtype)
+    new_indices = np.empty(nb, dtype=nb_by_column.dtype)
+
+    i_column = np.empty(nb_by_column.size + 1, dtype="u4")
+    i_column[0] = 0
+    i_column[1:] = nb_by_column.cumsum()
+    nb_by_row = np.bincount(indices)
+    i_c, i_c_stop = 0, i_column[1]
+    row_cur = nb_by_row.cumsum() - nb_by_row
+    for i in range(nb):
+        i_row = indices[i]
+        new_i = row_cur[i_row]
+        new_data[new_i] = data[i]
+        while i >= i_c_stop:
+            i_c += 1
+            i_c_stop = i_column[i_c + 1]
+        new_indices[new_i] = i_c
+        row_cur[i_row] += 1
+    return new_data, new_indices, nb_by_row

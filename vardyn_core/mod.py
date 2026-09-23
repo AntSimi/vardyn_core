@@ -9,7 +9,6 @@ import os
 import sys
 
 import jax
-from jax import jit
 import jax.numpy as jnp
 import matplotlib.pylab as plt
 import numpy as np
@@ -1206,7 +1205,7 @@ class Model_qg1l(M):
 
             # Add MDT to sla to get SSH
             if self.mdt is not None:
-                ssh = State0.getvar(name_var=self.name_var["SSH"]) + self.mdt
+                ssh = State0.getvar(name_var=self.name_var["SSH"], copy=False) + self.mdt
                 State0.setvar(ssh, name_var="ssh")
                 if name_var is not None:
                     name_var_diag += ["ssh"]
@@ -1324,7 +1323,7 @@ class Model_qg1l(M):
         Xb = self.bc_values[t0]
 
         if self.advect_tracer:
-            Xb = Xb[np.newaxis, :, :]
+            Xb = [Xb]
             for name in self.name_var:
                 if name != "SSH" and name in self.bc and len(self.bc[name].keys()) > 0:
                     if t1 in self.bc[name]:
@@ -1335,8 +1334,8 @@ class Model_qg1l(M):
                         idx_closest = np.argmin(np.abs(t_list - t1))
                         new_t1 = t_list[idx_closest]
                         Cb = self.bc[name][new_t1]
-                    Xb = np.append(Xb, Cb[np.newaxis, :, :], axis=0)
-
+                    Xb.append(Cb)
+            Xb = np.array(Xb)
         return Xb
 
     def step(self, State, nstep=1, t=0):
@@ -1350,16 +1349,16 @@ class Model_qg1l(M):
         c_eff = (self.qgm.c + State.params["c"].astype(self.qgm.dtype)) if "c" in self.name_params else None
 
         # Get state variable(s)
-        X0 = [State.getvar(name_var=self.name_var["SSH"])]
+        X0 = [State.getvar(name_var=self.name_var["SSH"], copy=False)]
         if self.advect_tracer:
             # Ageostrophic velocities
             if self.ageo_velocities:
-                X0.append(State.getvar(name_var=self.name_var["U"]))
-                X0.append(State.getvar(name_var=self.name_var["V"]))
+                X0.append(State.getvar(name_var=self.name_var["U"], copy=False))
+                X0.append(State.getvar(name_var=self.name_var["V"], copy=False))
             # Tracers
             for name in self.name_var:
                 if name not in ["SSH", "U", "V"]:
-                    X0.append(State.getvar(name_var=self.name_var[name]))
+                    X0.append(State.getvar(name_var=self.name_var[name], copy=False))
         if len(X0) == 1:
             X0 = X0[0]
         else:
@@ -1405,25 +1404,26 @@ class Model_qg1l(M):
         dX0 = dState.getvar(name_var=self.name_var["SSH"]).astype("float64")
         X0 = State.getvar(name_var=self.name_var["SSH"]).astype("float64")
         if self.advect_tracer:
-            dX0 = dX0[np.newaxis, :, :]
-            X0 = X0[np.newaxis, :, :]
+            dX0 = [dX0]
+            X0 = [X0]
             # Ageostrophic velocities
             if self.ageo_velocities:
-                U = State.getvar(name_var=self.name_var["U"])[np.newaxis, :, :]
-                V = State.getvar(name_var=self.name_var["V"])[np.newaxis, :, :]
-                dU = dState.getvar(name_var=self.name_var["U"])[np.newaxis, :, :]
-                dV = dState.getvar(name_var=self.name_var["V"])[np.newaxis, :, :]
-                X0 = np.append(X0, U, axis=0)
-                X0 = np.append(X0, V, axis=0)
-                dX0 = np.append(dX0, dU, axis=0)
-                dX0 = np.append(dX0, dV, axis=0)
+                U = State.getvar(name_var=self.name_var["U"])
+                V = State.getvar(name_var=self.name_var["V"])
+                dU = dState.getvar(name_var=self.name_var["U"])
+                dV = dState.getvar(name_var=self.name_var["V"])
+                X0.append(U)
+                X0.append(V)
+                dX0.append(dU, axis=0)
+                dX0.append(dV, axis=0)
             # Tracers
             for name in self.name_var:
                 if name not in ["SSH", "U", "V"]:
-                    dC0 = dState.getvar(name_var=self.name_var[name])[np.newaxis, :, :]
-                    dX0 = np.append(dX0, dC0, axis=0)
-                    C0 = State.getvar(name_var=self.name_var[name])[np.newaxis, :, :]
-                    X0 = np.append(X0, C0, axis=0)
+                    dC0 = dState.getvar(name_var=self.name_var[name])
+                    dX0.append(dC0)
+                    C0 = State.getvar(name_var=self.name_var[name])
+                    X0.append(C0)
+            X0, dX0 = np.array(X0), np.array(dX0)
 
         # init
         dX1 = +dX0.astype("float64")
@@ -1471,28 +1471,29 @@ class Model_qg1l(M):
         c_eff = (self.qgm.c + State.params["c"].astype(self.qgm.dtype)) if "c" in self.name_params else None
 
         # Get state variable
-        adSSH0 = adState.getvar(name_var=self.name_var["SSH"])  # .astype('float64')
-        SSH0 = State.getvar(name_var=self.name_var["SSH"])  # .astype('float64')
+        adSSH0 = adState.getvar(name_var=self.name_var["SSH"], copy=False)  # .astype('float64')
+        SSH0 = State.getvar(name_var=self.name_var["SSH"], copy=False)  # .astype('float64')
         if self.advect_tracer:
-            adX0 = adSSH0[np.newaxis, :, :]
-            X0 = SSH0[np.newaxis, :, :]
+            adX0 = [adSSH0]
+            X0 = [SSH0]
             # Ageostrophic velocities
             if self.ageo_velocities:
-                U = State.getvar(name_var=self.name_var["U"])[np.newaxis, :, :]
-                V = State.getvar(name_var=self.name_var["V"])[np.newaxis, :, :]
-                adU = adState.getvar(name_var=self.name_var["U"])[np.newaxis, :, :]
-                adV = adState.getvar(name_var=self.name_var["V"])[np.newaxis, :, :]
-                X0 = np.append(X0, U, axis=0)
-                X0 = np.append(X0, V, axis=0)
-                adX0 = np.append(adX0, adU, axis=0)
-                adX0 = np.append(adX0, adV, axis=0)
+                U = State.getvar(name_var=self.name_var["U"], copy=False)
+                V = State.getvar(name_var=self.name_var["V"], copy=False)
+                adU = adState.getvar(name_var=self.name_var["U"], copy=False)
+                adV = adState.getvar(name_var=self.name_var["V"], copy=False)
+                X0.append(U)
+                X0.append(V)
+                adX0.append(adU)
+                adX0.append(adV)
             # Tracers
-            for name in self.name_var:
-                if name not in ["SSH", "U", "V"]:
-                    adC0 = adState.getvar(name_var=self.name_var[name])[np.newaxis, :, :]
-                    adX0 = np.append(adX0, adC0, axis=0)
-                    C0 = State.getvar(name_var=self.name_var[name])[np.newaxis, :, :]
-                    X0 = np.append(X0, C0, axis=0)
+            for key, name in self.name_var.items():
+                if key not in ["SSH", "U", "V"]:
+                    adC0 = adState.getvar(name_var=name, copy=False)
+                    adX0.append(adC0)
+                    C0 = State.getvar(name_var=name, copy=False)
+                    X0.append(C0)
+            X0, adX0 = np.array(X0), np.array(adX0)
         else:
             adX0 = adSSH0
             X0 = SSH0
@@ -1513,21 +1514,22 @@ class Model_qg1l(M):
 
         # Update state and parameters
         if self.name_var["SSH"] in adState.params:
-            for i, name in enumerate(self.name_var):
-                adparams = nstep * self.dt / (3600 * 24) * adState.getvar(name_var=self.name_var[name])  # .astype('float64')
-                if name != "SSH":
+            dt_s = nstep * self.dt / (3600 * 24)
+            for i, (key, name) in enumerate(self.name_var.items()):
+                adparams = dt_s * adState.getvar(name_var=name, copy=False)  # .astype('float64')
+                if key != "SSH":
                     adparams *= 1 - self.Wbc
                     if self.forcing_tracer_from_bc:
-                        Fc = State.params[self.name_var[name]]
+                        Fc = State.params[name]
                         adparams *= Xb[i] - X0[i]
-                        adX1[i] += -nstep * self.dt / (3600 * 24) * (1 - self.Wbc) * Fc * adX0[i]
-                adState.params[self.name_var[name]] += adparams
+                        adX1[i] += -dt_s * (1 - self.Wbc) * Fc * adX0[i]
+                adState.params[name] += adparams
 
         if self.advect_tracer:
             adState.setvar(adX1[0], self.name_var["SSH"])
-            for i, name in enumerate(self.name_var):
-                if name != "SSH":
-                    adState.setvar(adX1[i], self.name_var[name])
+            for adX1_, (key, name) in zip(adX1, self.name_var.items()):
+                if key != "SSH":
+                    adState.setvar(adX1_, name)
         else:
             adState.setvar(adX1, self.name_var["SSH"])
 
@@ -1964,11 +1966,11 @@ class Model_csw1l(_ITOpenBoundaryExtensionMixin, M):
         self.swm.bc_it_corner_weight_power = getattr(config.MOD, "bc_it_corner_weight_power", self.swm.bc_it_corner_weight_power)
 
         # Compile jax-related functions
-        self._jstep_jit = jit(self._jstep, static_argnames=["nstep"])
-        self._jstep_tgl_jit = jit(self._jstep_tgl, static_argnames=["nstep"])
-        self._jstep_adj_jit = jit(self._jstep_adj, static_argnames=["nstep"])
-        self._compute_advective_terms_from_bm_jit = jit(self._compute_advective_terms_from_bm)
-        self._compute_He_from_bm_jit = jit(self._compute_He_from_bm)
+        self._jstep_jit = jax.jit(self._jstep, static_argnames=["nstep"])
+        self._jstep_tgl_jit = jax.jit(self._jstep_tgl, static_argnames=["nstep"])
+        self._jstep_adj_jit = jax.jit(self._jstep_adj, static_argnames=["nstep"])
+        self._compute_advective_terms_from_bm_jit = jax.jit(self._compute_advective_terms_from_bm)
+        self._compute_He_from_bm_jit = jax.jit(self._compute_He_from_bm)
 
         # Functions related to time_scheme
         if self.time_scheme == "Euler":
@@ -6228,9 +6230,9 @@ class Model_bmit(_ITOpenBoundaryExtensionMixin, M):
         self.max_nstep = getattr(config.MOD, "max_nstep", 240)
 
         # Compile jax-related functions
-        self._jstep_jit = jit(self._jstep, static_argnames=["nstep"])
-        self._jstep_tgl_jit = jit(self._jstep_tgl, static_argnames=["nstep"])
-        self._jstep_adj_jit = jit(self._jstep_adj, static_argnames=["nstep"])
+        self._jstep_jit = jax.jit(self._jstep, static_argnames=["nstep"])
+        self._jstep_tgl_jit = jax.jit(self._jstep_tgl, static_argnames=["nstep"])
+        self._jstep_adj_jit = jax.jit(self._jstep_adj, static_argnames=["nstep"])
 
         # Functions related to IT time_scheme
         self.time_scheme_it = config.MOD.time_scheme_it

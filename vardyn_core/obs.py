@@ -120,12 +120,14 @@ def _open_obs_dataset(name_obs, OBS, date_start=None, date_end=None):
     data_vars = {k: list() for k in fields}
     with Dataset(filenames[0]) as h:
         dims = h[fields[0]].dimensions
+        # In case of Grid Data
         if len(dims) != 1:
             coords[OBS.name_lon].append(h[OBS.name_lon][:])
             coords[OBS.name_lat].append(h[OBS.name_lat][:])
         time_units = h[OBS.name_time].units
     for f in filenames:
         with Dataset(f) as h:
+            # In case of Grid Data
             if len(dims) != 1:
                 coords[OBS.name_time].append(h[OBS.name_time][:])
             else:
@@ -586,7 +588,7 @@ def _obs_alti(ds, dt_list, dict_obs, obs_name, obs_attr, dt_timestep, out_path, 
 
     # Error file
     if obs_attr.path_err is not None:
-        print("READ AUX DATA FOR OBS ERROR VARIANCES ================================", obs_name)
+        logger.debug(f"READ AUX DATA FOR OBS ERROR VARIANCES ================================ {obs_name}")
         finterperr = read_auxdata(obs_attr.path_err, obs_attr.name_var_err, lon_unit)
     else:
         finterperr = None

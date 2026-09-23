@@ -31,9 +31,16 @@ class CrazyGradient(Exception):
     pass
 
 
+def wait_obj(x):
+    if hasattr(x, "block_until_ready"):
+        out = np.array(x.block_until_ready())
+        return out
+    return x
+
+
 def _block_until_ready(obj):
     """Wait for pending JAX work before reporting wall-clock timings."""
-    return jax.tree_util.tree_map(lambda x: x.block_until_ready() if hasattr(x, "block_until_ready") else x, obj)
+    return jax.tree_util.tree_map(wait_obj, obj)
 
 
 def set_env_variable():
@@ -122,7 +129,7 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
         Basis = basis.Basis(config, State)
 
     # Process observations
-    print("process observation operators")
+    logger.info("Process observation operators")
     Obsop.process_obs()
 
     # Compute checkpoints when the cost function will be evaluated
@@ -144,7 +151,7 @@ def Inv_4Dvar(config=None, State=None, Model=None, dict_obs=None, Obsop=None, Ba
     t_checkpoints.append(Model.T[-1])
     checkpoints = np.asarray(checkpoints)
     time_checkpoints = np.asarray(time_checkpoints)
-    print(f"--> {checkpoints.size} checkpoints to evaluate the cost function")
+    logger.info(f"--> {checkpoints.size} checkpoints to evaluate the cost function")
 
     # Boundary conditions at checkpoints
     Model.set_bc(time_checkpoints, t_bc=np.asarray(t_checkpoints))
@@ -834,6 +841,7 @@ class Variational:
             # 3. Run adjoint model
             if self.print_time:
                 time0 = time.time()
+            # print(State_dict)
             self.M.step_adj(t=t, adState=adState, State=State_dict[t], nstep=nstep)  # i+1 --> i
             if self.print_time:
                 _block_until_ready((adState.var, adState.params))

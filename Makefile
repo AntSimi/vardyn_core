@@ -39,7 +39,14 @@ check:
 	isort vardyn_core
 	black vardyn_core
 	flake8 vardyn_core --exit-zero
+
 	isort examples
 	black examples
 	flake8 examples --exit-zero
-	
+
+	isort tests
+	black tests
+	flake8 tests --exit-zero
+
+test:
+	python -m pytest tests -v
