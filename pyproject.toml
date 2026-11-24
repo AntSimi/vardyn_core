@@ -15,3 +15,13 @@ authors = [
 ]
 version = "2026.11.0"
 name = "vardyn_core"
+description = "Variational reconstruction of ocean dynamical variables"
+readme = "README.md"
+dependencies = [
+  "numpy<2",
+  "jax",
+  "xarray",
+  "scipy",
+  "netCDF4",
+]
+requires-python = ">=3.10"
