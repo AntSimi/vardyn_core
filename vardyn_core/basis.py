@@ -15,7 +15,7 @@ import numpy as np
 import scipy
 from scipy.integrate import quad
 import scipy.interpolate
-from scipy.sparse import csc_matrix
+import scipy.sparse as scs
 import xarray as xr
 
 from .config import USE_FLOAT64
@@ -374,7 +374,7 @@ class _Basis_gauss3d:
         indptr = np.zeros((i + 2), dtype=int)
         indptr[1:] = np.cumsum(sizes)
 
-        return csc_matrix((data, indices, indptr), shape=(self.lon1d.size, self.ENSLAT.size))
+        return scs.csc_matrix((data, indices, indptr), shape=(self.lon1d.size, self.ENSLAT.size))
 
     def _compute_component_time(self, time):
         """
@@ -577,7 +577,7 @@ class Basis_gauss3d(_Basis_gauss3d):
                         if fact != 0:
                             Gt_np[i, ind_tmp : ind_tmp + 1] = fact
                 ind_tmp += 1
-        return csc_matrix(Gt_np.T), None
+        return scs.csc_matrix(Gt_np.T), None
 
     def _ssh2uv(self, ssh):
         """
@@ -891,7 +891,7 @@ class _Basis_gauss2d:
             ind_tmp += indphys.size
         indptr = np.zeros((i + 2,), dtype=int)
         indptr[1:] = np.cumsum(sizes)
-        return csc_matrix((data, indices, indptr), shape=(self.lon1d.size, self.ENSLAT.size))
+        return scs.csc_matrix((data, indices, indptr), shape=(self.lon1d.size, self.ENSLAT.size))
 
     def _ssh2uv(self, ssh):
         _ssh = np.pad(ssh, pad_width=((1, 0), (1, 0)), mode="edge")
@@ -1644,7 +1644,7 @@ class _Basis_bmaux:
             indptr = np.zeros((nwaves + 1), dtype=int)
             indptr[1:] = np.cumsum(sizes)
 
-            Gx[iff] = csc_matrix((data, indices, indptr), shape=(self.nphys, nwaves))
+            Gx[iff] = scs.csc_matrix((data, indices, indptr), shape=(self.nphys, nwaves))
 
         return Gx, Nx
 
@@ -1822,21 +1822,24 @@ class Basis_bmaux(_Basis_bmaux):
         Gx = []
         GxT = []
         Nx = []
+        nb_wave_by_pos = 2 * self.ntheta
+        for NP, enslon, enslat, DX, k in zip(self.NP, self.ENSLON, self.ENSLAT, self.DX, self.k):
 
-        for iff in range(self.nf):
-
-            data = np.empty((2 * self.ntheta * self.NP[iff] * self.nphys,))
-            indices = np.empty((2 * self.ntheta * self.NP[iff] * self.nphys,), dtype=int)
-            sizes = np.zeros((2 * self.ntheta * self.NP[iff],), dtype=int)
+            data = np.empty((nb_wave_by_pos * NP * self.nphys))
+            indices = np.empty((nb_wave_by_pos * NP * self.nphys), dtype=int)
+            sizes = np.zeros((nb_wave_by_pos * NP), dtype=int)
 
             ind_tmp = 0
             iwave = 0
 
-            for P in range(self.NP[iff]):
-                # Obs selection around point P
-                dx = (self.lon1d - self.ENSLON[iff][P]) / self.km2deg * np.cos(self.ENSLAT[iff][P] * np.pi / 180.0)
-                dy = (self.lat1d - self.ENSLAT[iff][P]) / self.km2deg
-                indphys = np.where((np.abs(dx) <= self.DX[iff]) & (np.abs(dy) <= self.DX[iff]))[0]
+            for lon, lat in zip(enslon, enslat):
+                # Obs selection around point
+                dx = (self.lon1d - lon) / self.km2deg * np.cos(lat * np.pi / 180.0)
+                dy = (self.lat1d - lat) / self.km2deg
+                indphys = np.where((np.abs(dx) <= DX) & (np.abs(dy) <= DX))[0]
+                if indphys.size == 0:
+                    iwave += nb_wave_by_pos
+                    continue
                 xx = dx[indphys]
                 yy = dy[indphys]
                 # Spatial tapering shape of the wavelet
@@ -1854,25 +1857,22 @@ class Basis_bmaux(_Basis_bmaux):
                     xx = xx[facd > 0]
                     yy = yy[facd > 0]
                     facd = facd[facd > 0]
-
-                facs = mywindow(xx / self.DX[iff]) * mywindow(yy / self.DX[iff]) * facd
-
-                for itheta in range(self.ntheta):
+                    facs = mywindow(xx / DX) * mywindow(yy / DX) * facd
+                else:
+                    facs = mywindow(xx / DX) * mywindow(yy / DX)
+                sizes[iwave : iwave + nb_wave_by_pos] = indphys.size
+                iwave += nb_wave_by_pos
+                for theta in self.theta:
                     # Wave vector components
-                    kx = self.k[iff] * np.cos(self.theta[itheta])
-                    ky = self.k[iff] * np.sin(self.theta[itheta])
+                    k_product = k * (np.cos(theta) * xx + np.sin(theta) * yy)
                     # Cosine component
-                    sizes[iwave] = indphys.size
                     indices[ind_tmp : ind_tmp + indphys.size] = indphys
-                    data[ind_tmp : ind_tmp + indphys.size] = np.sqrt(2) * facs * np.cos(kx * (xx) + ky * (yy))
+                    data[ind_tmp : ind_tmp + indphys.size] = np.sqrt(2) * facs * np.cos(k_product)
                     ind_tmp += indphys.size
-                    iwave += 1
                     # Sine component
-                    sizes[iwave] = indphys.size
                     indices[ind_tmp : ind_tmp + indphys.size] = indphys
-                    data[ind_tmp : ind_tmp + indphys.size] = np.sqrt(2) * facs * np.sin(kx * (xx) + ky * (yy))
+                    data[ind_tmp : ind_tmp + indphys.size] = np.sqrt(2) * facs * np.sin(k_product)
                     ind_tmp += indphys.size
-                    iwave += 1
 
             nwaves = iwave
             Nx.append(nwaves)
@@ -1884,26 +1884,31 @@ class Basis_bmaux(_Basis_bmaux):
             indptr = np.zeros((nwaves + 1), dtype=int)
             indptr[1:] = np.cumsum(sizes)
             Gx.append(csc((data, indices, sizes), shape=(self.nphys, nwaves), wave_repetition=2 * self.ntheta))
-            GxT.append(csc_matrix(csc_matrix((data, indices, indptr), shape=(self.nphys, nwaves)).T))
+            GxT.append(scs.csc_matrix(scs.csc_matrix((data, indices, indptr), shape=(self.nphys, nwaves)).T))
         self.GxT = GxT
+        # self.GxT = scs.vstack(GxT)
         return Gx, Nx
 
     def _compute_component_time(self, time):
+        # TODO : must generate directly sparse matrix
         Gt = {}  # Time operator that gathers the time factors for each frequency
-        for iff in range(self.nf):
+        nb_wave_by_pos = 2 * self.ntheta
+        for iff, (ensts, NP, tdecs, norm_facts) in enumerate(zip(self.enst, self.NP, self.tdec, self.norm_fact)):
             nbasis_f = self.iff_wavebounds[iff + 1] - self.iff_wavebounds[iff]
-            Gt_np = np.zeros((time.size, nbasis_f))
+            Gt_np = np.zeros((nbasis_f, time.size))
             ind_tmp = 0
-            for it in range(self.enst[iff].shape[1]):
-                for P in range(self.NP[iff]):
-                    for i, t in enumerate(time):
-                        dt = t - self.enst[iff][P, it]
-                        if not (abs(dt) > self.tdec[iff][P] or np.isnan(self.enst[iff][P, it])):
-                            fact = self.window(dt / self.tdec[iff][P])
-                            fact /= self.norm_fact[iff][P]
-                            Gt_np[i, ind_tmp : ind_tmp + 2 * self.ntheta] = fact
-                    ind_tmp += 2 * self.ntheta
-            Gt[iff] = csc_matrix(Gt_np.T)
+            for enst in ensts.T:
+                for enst_, tdec, norm_fact in zip(enst, tdecs, norm_facts):
+                    if np.isnan(enst_):
+                        ind_tmp += nb_wave_by_pos
+                        continue
+                    dt = time - enst_
+                    i = np.where(abs(dt) < tdec)[0]
+                    facts = self.window(dt[i] / tdec) / norm_fact
+                    for j in range(ind_tmp, ind_tmp + nb_wave_by_pos):
+                        Gt_np[j, i] = facts
+                    ind_tmp += nb_wave_by_pos
+            Gt[iff] = scs.csc_matrix(Gt_np)
 
         return Gt, None
 
@@ -1960,16 +1965,13 @@ class Basis_bmaux(_Basis_bmaux):
         """Project a 2D physical adjoint field back to reduced space."""
 
         phi_1d = phi_2d.ravel()
-
         adX = []
         for iff in range(self.nf):
+            ad_space = self.GxT[iff] @ phi_1d
             Gt = self.get_Gt_value(t, iff)
             Nx_val = self.Nx[iff]
-            ad_space = self.GxT[iff] @ phi_1d
-            # ad_space = self.Gx[iff].tdot(phi_1d)
             adX_f = Gt.reshape((-1, Nx_val)) * ad_space[None, :]
             adX.append(adX_f.ravel())
-
         return np.concatenate(adX)
 
     def operg(self, t, X, State=None):
