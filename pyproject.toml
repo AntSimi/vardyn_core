@@ -3,3 +3,13 @@ requires = ["setuptools"]
 
 [tool.black]
 line-length = 140
+
+[project]
+authors = [
+    { name = "Florian Le Guillou", email = "florian.leguillou@datlas.fr" },
+    { name = "Valentin Bellemin-Laponnaz", email = "valentin.bellemin@hotmail.fr" },
+    { name = "Sammy Metref", email = "sammy.metref@datlas.fr" },
+    { name = "Clément Ubelmann", email = "clement.ubelmann@datlas.fr" },
+    { name = "Antoine Delepoulle", email = "antoine.delepoulle@datlas.fr" },
+    { name = "Emmanuel Cosme", email = "Emmanuel.Cosme@univ-grenoble-alpes.fr" },
+]
