@@ -1,0 +1,5 @@
+numpy < 2
+jax
+xarray
+scipy
+netCDF4

@@ -1,0 +1,11 @@
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.10
+  - pip
+  - pip:
+    - -r ../../requirements.txt
+    - furo
+    - sphinx-gallery
+    - sphinx_rtd_theme
+    - sphinx>=3.1
