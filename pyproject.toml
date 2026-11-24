@@ -13,3 +13,4 @@ authors = [
     { name = "Antoine Delepoulle", email = "antoine.delepoulle@datlas.fr" },
     { name = "Emmanuel Cosme", email = "Emmanuel.Cosme@univ-grenoble-alpes.fr" },
 ]
+version = "2026.11.0"
