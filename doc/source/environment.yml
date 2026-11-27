@@ -3,9 +3,9 @@ channels:
   - conda-forge
 dependencies:
   - python>=3.10
+  - -r ../../requirements.txt
   - pip
   - pip:
-    - -r ../../requirements.txt
     - furo
     - sphinx-gallery
     - sphinx_rtd_theme
