@@ -4,7 +4,7 @@ conda:
 build:
   os: ubuntu-lts-latest
   tools:
-    python: "mambaforge-latest"
+    python: "miniconda-latest"
 python:
   install:
     - method: pip
